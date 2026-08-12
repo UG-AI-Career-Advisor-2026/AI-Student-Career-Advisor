@@ -13,7 +13,7 @@
     ],
     "recommendedCertifications": [
       "Microsoft Certified: Azure Developer Associate",
-      "Oracle Certified Professional: Java SE Developer"
+      "Oracle Certified Professional: Java SE 21 Developer"
     ],
     "suggestedLearningTopics": [
       "Design Patterns and SOLID Principles",
@@ -128,7 +128,7 @@
     ],
     "recommendedCertifications": [
       "Microsoft Certified: Azure Database Administrator Associate",
-      "Oracle Certified Professional: MySQL Database Administrator"
+      "Oracle Certified Professional, MySQL 8.0 Database Administrator"
     ],
     "suggestedLearningTopics": [
       "NoSQL Databases (MongoDB/Cassandra)",
@@ -173,7 +173,7 @@
       "MLOps Practices"
     ],
     "recommendedCertifications": [
-      "AWS Certified Machine Learning - Specialty",
+      "AWS Certified Machine Learning Engineer - Associate",
       "Google Professional Machine Learning Engineer"
     ],
     "suggestedLearningTopics": [

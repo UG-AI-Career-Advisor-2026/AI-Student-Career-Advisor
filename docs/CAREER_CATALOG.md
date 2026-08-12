@@ -37,3 +37,6 @@ The skills, certifications, and learning topics were compiled using official cer
 - **Cisco Learning Network**: [https://learningnetwork.cisco.com/s/certifications](https://learningnetwork.cisco.com/s/certifications)
 - **Oracle University**: [https://education.oracle.com/](https://education.oracle.com/)
 - **Nielsen Norman Group (NN/g)**: [https://www.nngroup.com/training/](https://www.nngroup.com/training/)
+- **AWS Certified Machine Learning Engineer – Associate**: [Official AWS certification page](https://aws.amazon.com/certification/certified-machine-learning-engineer-associate/)
+- **Oracle Certified Professional: Java SE 21 Developer**: [Official Oracle certification page](https://education.oracle.com/java-se-21-developer-certified-professional/trackp_JSE21OCP)
+- **Oracle Certified Professional, MySQL 8.0 Database Administrator**: [Official Oracle certification page](https://education.oracle.com/products/trackp_MYSQLDBA80OCP)
