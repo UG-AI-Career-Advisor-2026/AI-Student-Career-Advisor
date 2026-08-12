@@ -1,0 +1,461 @@
+From da2e17b4b4754c915986d464d86bbee6efaacb3e Mon Sep 17 00:00:00 2001
+From: CareerIQ Dev <careeriq@example.com>
+Date: Wed, 12 Aug 2026 10:16:28 +0000
+Subject: [PATCH] Add UI shell: navigation and placeholder pages for CareerIQ
+
+- Replace default Blazor branding/demo content (Hello world, About link, purple sidebar)
+- Remove Counter and Weather example pages
+- Add Home, Student Profile, Career Assessment, Recommendations,
+  Learning Roadmap, Recommendation History pages
+- Add responsive nav with active link states (desktop sidebar / mobile collapsible)
+- Add reusable PlaceholderNotice component; unfinished pages clearly marked
+- No fake AI recommendation data, no DB or ML.NET wiring
+- Scoped entirely to src/CareerAdvisor.Web
+---
+ .../Components/Layout/MainLayout.razor        | 44 +++++------
+ .../Components/Layout/MainLayout.razor.css    |  2 +-
+ .../Components/Layout/NavMenu.razor           | 77 +++++++++++--------
+ .../Components/Pages/CareerAssessment.razor   | 15 ++++
+ .../Components/Pages/Counter.razor            | 19 -----
+ .../Components/Pages/Home.razor               | 47 +++++++++--
+ .../Components/Pages/LearningRoadmap.razor    | 14 ++++
+ .../Pages/RecommendationHistory.razor         | 15 ++++
+ .../Components/Pages/Recommendations.razor    | 15 ++++
+ .../Components/Pages/StudentProfile.razor     | 15 ++++
+ .../Components/Pages/Weather.razor            | 64 ---------------
+ .../Components/Shared/PlaceholderNotice.razor |  9 +++
+ .../Components/_Imports.razor                 |  3 +-
+ 13 files changed, 194 insertions(+), 145 deletions(-)
+ create mode 100644 src/CareerAdvisor.Web/Components/Pages/CareerAssessment.razor
+ delete mode 100644 src/CareerAdvisor.Web/Components/Pages/Counter.razor
+ create mode 100644 src/CareerAdvisor.Web/Components/Pages/LearningRoadmap.razor
+ create mode 100644 src/CareerAdvisor.Web/Components/Pages/RecommendationHistory.razor
+ create mode 100644 src/CareerAdvisor.Web/Components/Pages/Recommendations.razor
+ create mode 100644 src/CareerAdvisor.Web/Components/Pages/StudentProfile.razor
+ delete mode 100644 src/CareerAdvisor.Web/Components/Pages/Weather.razor
+ create mode 100644 src/CareerAdvisor.Web/Components/Shared/PlaceholderNotice.razor
+
+diff --git a/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor b/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor
+index 9e253ba..7707aad 100644
+--- a/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor
++++ b/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor
+@@ -1,23 +1,21 @@
+-﻿@inherits LayoutComponentBase
+-
+-<div class="page">
+-    <div class="sidebar">
+-        <NavMenu />
+-    </div>
+-
+-    <main>
+-        <div class="top-row px-4">
+-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+-        </div>
+-
+-        <article class="content px-4">
+-            @Body
+-        </article>
+-    </main>
+-</div>
+-
+-<div id="blazor-error-ui" data-nosnippet>
+-    An unhandled error has occurred.
+-    <a href="." class="reload">Reload</a>
+-    <span class="dismiss">🗙</span>
+-</div>
++@inherits LayoutComponentBase
++
++<a href="#main-content" class="visually-hidden-focusable">Skip to main content</a>
++
++<div class="page">
++    <div class="sidebar">
++        <NavMenu />
++    </div>
++
++    <main>
++        <article id="main-content" class="content px-4" aria-label="Main content">
++            @Body
++        </article>
++    </main>
++</div>
++
++<div id="blazor-error-ui" data-nosnippet>
++    An unhandled error has occurred.
++    <a href="." class="reload">Reload</a>
++    <span class="dismiss">🗙</span>
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor.css b/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor.css
+index f29f3c3..4363e46 100644
+--- a/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor.css
++++ b/src/CareerAdvisor.Web/Components/Layout/MainLayout.razor.css
+@@ -9,7 +9,7 @@ main {
+ }
+ 
+ .sidebar {
+-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
++    background-image: linear-gradient(180deg, #0b1f3f 0%, #123a5c 100%);
+ }
+ 
+ .top-row {
+diff --git a/src/CareerAdvisor.Web/Components/Layout/NavMenu.razor b/src/CareerAdvisor.Web/Components/Layout/NavMenu.razor
+index 4f6ad12..0e5b706 100644
+--- a/src/CareerAdvisor.Web/Components/Layout/NavMenu.razor
++++ b/src/CareerAdvisor.Web/Components/Layout/NavMenu.razor
+@@ -1,30 +1,47 @@
+-﻿<div class="top-row ps-3 navbar navbar-dark">
+-    <div class="container-fluid">
+-        <a class="navbar-brand" href="">CareerAdvisor.Web</a>
+-    </div>
+-</div>
+-
+-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+-
+-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+-    <nav class="nav flex-column">
+-        <div class="nav-item px-3">
+-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+-            </NavLink>
+-        </div>
+-
+-        <div class="nav-item px-3">
+-            <NavLink class="nav-link" href="counter">
+-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+-            </NavLink>
+-        </div>
+-
+-        <div class="nav-item px-3">
+-            <NavLink class="nav-link" href="weather">
+-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+-            </NavLink>
+-        </div>
+-    </nav>
+-</div>
+-
++<div class="top-row ps-3 navbar navbar-dark">
++    <div class="container-fluid">
++        <a class="navbar-brand" href="">CareerIQ</a>
++    </div>
++</div>
++
++<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
++
++<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
++    <nav class="nav flex-column" aria-label="Primary">
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
++                <span aria-hidden="true">🏠</span> Home
++            </NavLink>
++        </div>
++
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="student-profile">
++                <span aria-hidden="true">👤</span> Student Profile
++            </NavLink>
++        </div>
++
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="career-assessment">
++                <span aria-hidden="true">📝</span> Career Assessment
++            </NavLink>
++        </div>
++
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="recommendations">
++                <span aria-hidden="true">💡</span> Recommendations
++            </NavLink>
++        </div>
++
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="learning-roadmap">
++                <span aria-hidden="true">🗺️</span> Learning Roadmap
++            </NavLink>
++        </div>
++
++        <div class="nav-item px-3">
++            <NavLink class="nav-link" href="recommendation-history">
++                <span aria-hidden="true">🕘</span> Recommendation History
++            </NavLink>
++        </div>
++    </nav>
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/CareerAssessment.razor b/src/CareerAdvisor.Web/Components/Pages/CareerAssessment.razor
+new file mode 100644
+index 0000000..6ba2f39
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Pages/CareerAssessment.razor
+@@ -0,0 +1,15 @@
++@page "/career-assessment"
++
++<PageTitle>CareerIQ – Career Assessment</PageTitle>
++
++<h1>Career Assessment</h1>
++<p>A short set of questions will help identify your strengths and interests.</p>
++
++<PlaceholderNotice>
++    This page is a placeholder. The assessment questionnaire has not been
++    built yet.
++</PlaceholderNotice>
++
++<div class="border rounded p-4 text-center text-secondary">
++    No assessment questions available yet.
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/Counter.razor b/src/CareerAdvisor.Web/Components/Pages/Counter.razor
+deleted file mode 100644
+index ba08d04..0000000
+--- a/src/CareerAdvisor.Web/Components/Pages/Counter.razor
++++ /dev/null
+@@ -1,19 +0,0 @@
+-﻿@page "/counter"
+-@rendermode InteractiveServer
+-
+-<PageTitle>Counter</PageTitle>
+-
+-<h1>Counter</h1>
+-
+-<p role="status">Current count: @currentCount</p>
+-
+-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+-
+-@code {
+-    private int currentCount = 0;
+-
+-    private void IncrementCount()
+-    {
+-        currentCount++;
+-    }
+-}
+diff --git a/src/CareerAdvisor.Web/Components/Pages/Home.razor b/src/CareerAdvisor.Web/Components/Pages/Home.razor
+index df05023..a639de6 100644
+--- a/src/CareerAdvisor.Web/Components/Pages/Home.razor
++++ b/src/CareerAdvisor.Web/Components/Pages/Home.razor
+@@ -1,7 +1,40 @@
+-﻿@page "/"
+-
+-<PageTitle>Home</PageTitle>
+-
+-<h1>Hello, world!</h1>
+-
+-Welcome to your new app.
++@page "/"
++
++<PageTitle>CareerIQ – Home</PageTitle>
++
++<h1>Welcome to CareerIQ</h1>
++<p class="lead">
++    CareerIQ helps students explore career paths that fit their skills and
++    interests. Build your profile and complete the assessment to see
++    personalised recommendations and a learning roadmap.
++</p>
++
++<div class="row g-3 mt-2">
++    <div class="col-12 col-md-4">
++        <div class="card h-100">
++            <div class="card-body">
++                <h2 class="h5 card-title">1. Build your profile</h2>
++                <p class="card-text">Tell us about your programme, interests, and skills.</p>
++                <a class="btn btn-primary" href="student-profile">Go to Student Profile</a>
++            </div>
++        </div>
++    </div>
++    <div class="col-12 col-md-4">
++        <div class="card h-100">
++            <div class="card-body">
++                <h2 class="h5 card-title">2. Take the assessment</h2>
++                <p class="card-text">Answer a short set of questions about your strengths and preferences.</p>
++                <a class="btn btn-primary" href="career-assessment">Go to Career Assessment</a>
++            </div>
++        </div>
++    </div>
++    <div class="col-12 col-md-4">
++        <div class="card h-100">
++            <div class="card-body">
++                <h2 class="h5 card-title">3. Review recommendations</h2>
++                <p class="card-text">See career paths that match your profile once the assessment is complete.</p>
++                <a class="btn btn-primary" href="recommendations">Go to Recommendations</a>
++            </div>
++        </div>
++    </div>
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/LearningRoadmap.razor b/src/CareerAdvisor.Web/Components/Pages/LearningRoadmap.razor
+new file mode 100644
+index 0000000..86c84f1
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Pages/LearningRoadmap.razor
+@@ -0,0 +1,14 @@
++@page "/learning-roadmap"
++
++<PageTitle>CareerIQ – Learning Roadmap</PageTitle>
++
++<h1>Learning Roadmap</h1>
++<p>A step-by-step plan for the skills and courses to reach your chosen career path will appear here.</p>
++
++<PlaceholderNotice>
++    This page is a placeholder. Roadmap generation has not been built yet.
++</PlaceholderNotice>
++
++<div class="border rounded p-4 text-center text-secondary">
++    Select a recommendation to generate a learning roadmap.
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/RecommendationHistory.razor b/src/CareerAdvisor.Web/Components/Pages/RecommendationHistory.razor
+new file mode 100644
+index 0000000..f1a2a9d
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Pages/RecommendationHistory.razor
+@@ -0,0 +1,15 @@
++@page "/recommendation-history"
++
++<PageTitle>CareerIQ – Recommendation History</PageTitle>
++
++<h1>Recommendation History</h1>
++<p>Past assessments and the recommendations they produced will be listed here.</p>
++
++<PlaceholderNotice>
++    This page is a placeholder. Saved recommendation history has not been
++    built yet.
++</PlaceholderNotice>
++
++<div class="border rounded p-4 text-center text-secondary">
++    No past recommendations yet.
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/Recommendations.razor b/src/CareerAdvisor.Web/Components/Pages/Recommendations.razor
+new file mode 100644
+index 0000000..46ac891
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Pages/Recommendations.razor
+@@ -0,0 +1,15 @@
++@page "/recommendations"
++
++<PageTitle>CareerIQ – Recommendations</PageTitle>
++
++<h1>Recommendations</h1>
++<p>Career paths matched to your profile and assessment will appear here.</p>
++
++<PlaceholderNotice>
++    This page is a placeholder. Recommendations are not generated yet — the
++    matching logic has not been built.
++</PlaceholderNotice>
++
++<div class="border rounded p-4 text-center text-secondary">
++    Complete your Student Profile and Career Assessment to see recommendations.
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/StudentProfile.razor b/src/CareerAdvisor.Web/Components/Pages/StudentProfile.razor
+new file mode 100644
+index 0000000..fcef103
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Pages/StudentProfile.razor
+@@ -0,0 +1,15 @@
++@page "/student-profile"
++
++<PageTitle>CareerIQ – Student Profile</PageTitle>
++
++<h1>Student Profile</h1>
++<p>Your programme of study, interests, and skills will be captured here.</p>
++
++<PlaceholderNotice>
++    This page is a placeholder. The profile form and data storage have not been
++    built yet.
++</PlaceholderNotice>
++
++<div class="border rounded p-4 text-center text-secondary">
++    No profile information yet.
++</div>
+diff --git a/src/CareerAdvisor.Web/Components/Pages/Weather.razor b/src/CareerAdvisor.Web/Components/Pages/Weather.razor
+deleted file mode 100644
+index d00febb..0000000
+--- a/src/CareerAdvisor.Web/Components/Pages/Weather.razor
++++ /dev/null
+@@ -1,64 +0,0 @@
+-﻿@page "/weather"
+-@attribute [StreamRendering]
+-
+-<PageTitle>Weather</PageTitle>
+-
+-<h1>Weather</h1>
+-
+-<p>This component demonstrates showing data.</p>
+-
+-@if (forecasts == null)
+-{
+-    <p><em>Loading...</em></p>
+-}
+-else
+-{
+-    <table class="table">
+-        <thead>
+-            <tr>
+-                <th>Date</th>
+-                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+-                <th aria-label="Temperature in Fahrenheit">Temp. (F)</th>
+-                <th>Summary</th>
+-            </tr>
+-        </thead>
+-        <tbody>
+-            @foreach (var forecast in forecasts)
+-            {
+-                <tr>
+-                    <td>@forecast.Date.ToShortDateString()</td>
+-                    <td>@forecast.TemperatureC</td>
+-                    <td>@forecast.TemperatureF</td>
+-                    <td>@forecast.Summary</td>
+-                </tr>
+-            }
+-        </tbody>
+-    </table>
+-}
+-
+-@code {
+-    private WeatherForecast[]? forecasts;
+-
+-    protected override async Task OnInitializedAsync()
+-    {
+-        // Simulate asynchronous loading to demonstrate streaming rendering
+-        await Task.Delay(500);
+-
+-        var startDate = DateOnly.FromDateTime(DateTime.Now);
+-        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+-        forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
+-        {
+-            Date = startDate.AddDays(index),
+-            TemperatureC = Random.Shared.Next(-20, 55),
+-            Summary = summaries[Random.Shared.Next(summaries.Length)]
+-        }).ToArray();
+-    }
+-
+-    private class WeatherForecast
+-    {
+-        public DateOnly Date { get; set; }
+-        public int TemperatureC { get; set; }
+-        public string? Summary { get; set; }
+-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+-    }
+-}
+diff --git a/src/CareerAdvisor.Web/Components/Shared/PlaceholderNotice.razor b/src/CareerAdvisor.Web/Components/Shared/PlaceholderNotice.razor
+new file mode 100644
+index 0000000..75e3c54
+--- /dev/null
++++ b/src/CareerAdvisor.Web/Components/Shared/PlaceholderNotice.razor
+@@ -0,0 +1,9 @@
++<div class="alert alert-warning d-flex align-items-start gap-2" role="status">
++    <span class="badge text-bg-warning">Placeholder</span>
++    <span>@ChildContent</span>
++</div>
++
++@code {
++    [Parameter]
++    public RenderFragment? ChildContent { get; set; }
++}
+diff --git a/src/CareerAdvisor.Web/Components/_Imports.razor b/src/CareerAdvisor.Web/Components/_Imports.razor
+index cd6e810..a34a40e 100644
+--- a/src/CareerAdvisor.Web/Components/_Imports.razor
++++ b/src/CareerAdvisor.Web/Components/_Imports.razor
+@@ -8,4 +8,5 @@
+ @using Microsoft.JSInterop
+ @using CareerAdvisor.Web
+ @using CareerAdvisor.Web.Components
+-@using CareerAdvisor.Web.Components.Layout
++@using CareerAdvisor.Web.Components.Layout
++@using CareerAdvisor.Web.Components.Shared
+-- 
+2.43.0
+
