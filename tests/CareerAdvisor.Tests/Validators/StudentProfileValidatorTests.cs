@@ -47,10 +47,10 @@ public class StudentProfileValidatorTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_InvalidName_ReturnsFalse(string invalidName)
+    public void Validate_InvalidName_ReturnsFalse(string? invalidName)
     {
         var profile = GetValidProfile();
-        profile.Name = invalidName;
+        profile.Name = invalidName!;
 
         var result = _validator.Validate(profile);
 
@@ -122,10 +122,10 @@ public class StudentProfileValidatorTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_InvalidProgramme_ReturnsFalse(string invalidProgramme)
+    public void Validate_InvalidProgramme_ReturnsFalse(string? invalidProgramme)
     {
         var profile = GetValidProfile();
-        profile.Programme = invalidProgramme;
+        profile.Programme = invalidProgramme!;
 
         var result = _validator.Validate(profile);
 
