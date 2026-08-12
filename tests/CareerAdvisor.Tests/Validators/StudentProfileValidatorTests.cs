@@ -117,4 +117,32 @@ public class StudentProfileValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains("Updated date cannot be earlier than created date.", result.Errors);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_InvalidProgramme_ReturnsFalse(string invalidProgramme)
+    {
+        var profile = GetValidProfile();
+        profile.Programme = invalidProgramme;
+
+        var result = _validator.Validate(profile);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Programme is required.", result.Errors);
+    }
+
+    [Fact]
+    public void Validate_NoSkills_ReturnsFalse()
+    {
+        var profile = GetValidProfile();
+        profile.Skills = new List<StudentSkill>();
+
+        var result = _validator.Validate(profile);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("At least one skill is required.", result.Errors);
+    }
 }
+
