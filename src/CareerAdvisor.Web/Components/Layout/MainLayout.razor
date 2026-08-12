@@ -1,4 +1,6 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+
+<a href="#main-content" class="visually-hidden-focusable">Skip to main content</a>
 
 <div class="page">
     <div class="sidebar">
@@ -6,11 +8,7 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+        <article id="main-content" class="content px-4" aria-label="Main content">
             @Body
         </article>
     </main>
