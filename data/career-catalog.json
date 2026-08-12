@@ -1,0 +1,186 @@
+[
+  {
+    "code": "SD-001",
+    "name": "Software Developer",
+    "description": "Design, develop, test, and maintain software applications and systems to meet user needs and business requirements.",
+    "requiredSkills": [
+      "C# or Java Programming",
+      "Python Scripting",
+      "Git Version Control",
+      "RESTful API Design",
+      "Unit Testing",
+      "SQL and Database Integration"
+    ],
+    "recommendedCertifications": [
+      "Microsoft Certified: Azure Developer Associate",
+      "Oracle Certified Professional: Java SE Developer"
+    ],
+    "suggestedLearningTopics": [
+      "Design Patterns and SOLID Principles",
+      "Microservices Architecture",
+      "CI/CD Pipelines",
+      "Agile and Scrum Methodologies"
+    ]
+  },
+  {
+    "code": "DA-002",
+    "name": "Data Analyst",
+    "description": "Analyze complex datasets to extract actionable insights, create visualizations, and support strategic business decisions.",
+    "requiredSkills": [
+      "SQL Querying",
+      "Python or R Programming",
+      "Data Visualization (Tableau/Power BI)",
+      "Statistical Analysis",
+      "Data Cleaning and Wrangling",
+      "Excel/Spreadsheets"
+    ],
+    "recommendedCertifications": [
+      "Google Data Analytics Professional Certificate",
+      "Microsoft Certified: Power BI Data Analyst Associate"
+    ],
+    "suggestedLearningTopics": [
+      "A/B Testing and Experimentation",
+      "Data Warehousing Concepts",
+      "Machine Learning Basics for Analytics",
+      "Business Intelligence (BI) Strategy"
+    ]
+  },
+  {
+    "code": "CS-003",
+    "name": "Cybersecurity Analyst",
+    "description": "Monitor networks for security breaches, investigate incidents, and implement measures to protect organizational data and systems.",
+    "requiredSkills": [
+      "Network Security",
+      "Threat Intelligence",
+      "SIEM Tool Management",
+      "Incident Response",
+      "Vulnerability Assessment",
+      "Scripting (Python/Bash)"
+    ],
+    "recommendedCertifications": [
+      "CompTIA Security+",
+      "Certified Information Systems Security Professional (CISSP)"
+    ],
+    "suggestedLearningTopics": [
+      "Penetration Testing",
+      "Cryptography Fundamentals",
+      "Zero Trust Architecture",
+      "Digital Forensics"
+    ]
+  },
+  {
+    "code": "CE-004",
+    "name": "Cloud Engineer",
+    "description": "Design, deploy, and manage scalable cloud infrastructure and services to support enterprise applications and workloads.",
+    "requiredSkills": [
+      "AWS/Azure/GCP Platforms",
+      "Infrastructure as Code (Terraform)",
+      "Docker and Containerization",
+      "Kubernetes Orchestration",
+      "CI/CD Integration",
+      "Linux Administration"
+    ],
+    "recommendedCertifications": [
+      "AWS Certified Solutions Architect - Associate",
+      "Microsoft Certified: Azure Administrator Associate"
+    ],
+    "suggestedLearningTopics": [
+      "Serverless Computing",
+      "Cloud Security Best Practices",
+      "Cost Optimization Strategies",
+      "Site Reliability Engineering (SRE)"
+    ]
+  },
+  {
+    "code": "NA-005",
+    "name": "Network Administrator",
+    "description": "Install, configure, and maintain local area networks (LANs), wide area networks (WANs), and network segments.",
+    "requiredSkills": [
+      "Routing and Switching",
+      "TCP/IP Protocol Suite",
+      "DNS and DHCP Configuration",
+      "Network Monitoring",
+      "Firewall Management",
+      "Packet Analysis (Wireshark)"
+    ],
+    "recommendedCertifications": [
+      "Cisco Certified Network Associate (CCNA)",
+      "CompTIA Network+"
+    ],
+    "suggestedLearningTopics": [
+      "Software-Defined Networking (SDN)",
+      "Network Automation (Ansible)",
+      "IPv6 Migration",
+      "Load Balancing"
+    ]
+  },
+  {
+    "code": "DBA-006",
+    "name": "Database Administrator",
+    "description": "Manage, secure, and optimize organizational databases to ensure high availability, performance, and data integrity.",
+    "requiredSkills": [
+      "SQL Server / PostgreSQL / MySQL",
+      "Backup and Recovery Strategies",
+      "Performance Tuning",
+      "Database Security",
+      "Replication and Clustering",
+      "Scripting (Bash/Python)"
+    ],
+    "recommendedCertifications": [
+      "Microsoft Certified: Azure Database Administrator Associate",
+      "Oracle Certified Professional: MySQL Database Administrator"
+    ],
+    "suggestedLearningTopics": [
+      "NoSQL Databases (MongoDB/Cassandra)",
+      "Cloud Database Services",
+      "Disaster Recovery Planning",
+      "Data Modeling"
+    ]
+  },
+  {
+    "code": "UX-007",
+    "name": "UI/UX Designer",
+    "description": "Research user needs to design intuitive interfaces and engaging digital experiences through wireframes, prototypes, and testing.",
+    "requiredSkills": [
+      "Wireframing and Prototyping",
+      "User Research",
+      "Figma / Adobe XD",
+      "Usability Testing",
+      "Information Architecture",
+      "Visual Design Principles"
+    ],
+    "recommendedCertifications": [
+      "Google UX Design Professional Certificate",
+      "Nielsen Norman Group (NN/g) UX Certification"
+    ],
+    "suggestedLearningTopics": [
+      "Design Systems",
+      "Web Accessibility (WCAG)",
+      "Motion Design",
+      "Cognitive Psychology in Design"
+    ]
+  },
+  {
+    "code": "AI-008",
+    "name": "AI/ML Engineer",
+    "description": "Design, build, and deploy machine learning models and artificial intelligence solutions to solve complex predictive and analytical problems.",
+    "requiredSkills": [
+      "Python Programming",
+      "Machine Learning Algorithms",
+      "TensorFlow or PyTorch",
+      "Mathematics (Linear Algebra/Calculus)",
+      "Data Pipeline Construction",
+      "MLOps Practices"
+    ],
+    "recommendedCertifications": [
+      "AWS Certified Machine Learning - Specialty",
+      "Google Professional Machine Learning Engineer"
+    ],
+    "suggestedLearningTopics": [
+      "Deep Learning Architectures",
+      "Natural Language Processing (NLP)",
+      "Computer Vision",
+      "Reinforcement Learning"
+    ]
+  }
+]
