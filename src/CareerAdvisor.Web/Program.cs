@@ -1,24 +1,38 @@
+using CareerAdvisor.Core.Interfaces;
 using CareerAdvisor.Infrastructure.Data;
+using CareerAdvisor.Infrastructure.Repositories;
+using CareerAdvisor.Infrastructure.Services;
 using CareerAdvisor.Web.Components;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var careerCatalogPath = Path.GetFullPath(
+    Path.Combine(
+        builder.Environment.ContentRootPath,
+        "..",
+        "..",
+        "data",
+        "career-catalog.json"));
+
+builder.Services.AddSingleton<ICareerRepository>(
+    _ => new JsonCareerRepository(careerCatalogPath));
+
+builder.Services.AddScoped<ICareerService, CareerService>();
+
 var connectionString = builder.Configuration.GetConnectionString(
-    "CareerAdvisorDatabase")
+        "CareerAdvisorDatabase")
     ?? throw new InvalidOperationException(
         "Connection string 'CareerAdvisorDatabase' was not found.");
 
 builder.Services.AddDbContext<CareerAdvisorDbContext>(options =>
     options.UseSqlite(connectionString));
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -33,7 +47,6 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
