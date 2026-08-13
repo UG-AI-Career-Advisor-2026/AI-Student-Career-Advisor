@@ -13,6 +13,7 @@ public interface ICareerService
 {
     Task<IEnumerable<CareerProfile>> GetAllCareersAsync();
     Task<CareerProfile?> GetCareerByIdAsync(Guid id);
+    Task<CareerProfile?> GetCareerByCodeAsync(string code);
 }
 
 /// <summary>

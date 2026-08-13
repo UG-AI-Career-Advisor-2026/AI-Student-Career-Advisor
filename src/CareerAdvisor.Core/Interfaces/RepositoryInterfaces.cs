@@ -4,7 +4,10 @@ namespace CareerAdvisor.Core.Interfaces;
 
 public interface IStudentProfileRepository : IRepository<StudentProfile> { }
 
-public interface ICareerRepository : IRepository<CareerProfile> { }
+public interface ICareerRepository : IRepository<CareerProfile>
+{
+    Task<CareerProfile?> GetByCodeAsync(string code);
+}
 
 /// <summary>
 /// Persists recommendation sessions; backs the history contract.

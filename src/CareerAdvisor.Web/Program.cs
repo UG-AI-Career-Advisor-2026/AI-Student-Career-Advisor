@@ -1,6 +1,21 @@
+using CareerAdvisor.Core.Interfaces;
+using CareerAdvisor.Infrastructure.Repositories;
+using CareerAdvisor.Infrastructure.Services;
 using CareerAdvisor.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+var careerCatalogPath = Path.GetFullPath(
+    Path.Combine(
+        builder.Environment.ContentRootPath,
+        "..",
+        "..",
+        "data",
+        "career-catalog.json"));
+
+builder.Services.AddSingleton<ICareerRepository>(
+    _ => new JsonCareerRepository(careerCatalogPath));
+
+builder.Services.AddScoped<ICareerService, CareerService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
