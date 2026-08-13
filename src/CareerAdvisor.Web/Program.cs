@@ -1,9 +1,12 @@
 using CareerAdvisor.Core.Interfaces;
+using CareerAdvisor.Infrastructure.Data;
 using CareerAdvisor.Infrastructure.Repositories;
 using CareerAdvisor.Infrastructure.Services;
 using CareerAdvisor.Web.Components;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
 var careerCatalogPath = Path.GetFullPath(
     Path.Combine(
         builder.Environment.ContentRootPath,
@@ -17,22 +20,30 @@ builder.Services.AddSingleton<ICareerRepository>(
 
 builder.Services.AddScoped<ICareerService, CareerService>();
 
-// Add services to the container.
+var connectionString = builder.Configuration.GetConnectionString(
+        "CareerAdvisorDatabase")
+    ?? throw new InvalidOperationException(
+        "Connection string 'CareerAdvisorDatabase' was not found.");
+
+builder.Services.AddDbContext<CareerAdvisorDbContext>(options =>
+    options.UseSqlite(connectionString));
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
 
+app.UseStatusCodePagesWithReExecute(
+    "/not-found",
+    createScopeForStatusCodePages: true);
+
+app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
