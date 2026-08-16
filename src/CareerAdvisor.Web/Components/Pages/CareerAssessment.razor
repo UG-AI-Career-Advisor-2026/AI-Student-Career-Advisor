@@ -1,15 +1,418 @@
+@page "/assessment"
 @page "/career-assessment"
+@rendermode InteractiveServer
+
+@using CareerAdvisor.Core.Interfaces
+@using CareerAdvisor.Core.Models
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@inject IAssessmentService AssessmentService
+@inject ProtectedSessionStorage SessionStorage
 
 <PageTitle>CareerIQ – Career Assessment</PageTitle>
 
-<h1>Career Assessment</h1>
-<p>A short set of questions will help identify your strengths and interests.</p>
+<div class="container assessment-shell mt-4">
+    <header class="mb-4">
+        <h1>Career Assessment</h1>
+        <p class="text-muted">
+            Answer each question honestly to help CareerIQ understand
+            your interests, strengths and work preferences.
+        </p>
+    </header>
 
-<PlaceholderNotice>
-    This page is a placeholder. The assessment questionnaire has not been
-    built yet.
-</PlaceholderNotice>
+    @if (_isLoading)
+    {
+        <div class="text-center py-5" role="status">
+            <div class="spinner-border text-primary"
+                 aria-hidden="true"></div>
+            <p class="mt-3">Loading assessment…</p>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="alert alert-danger" role="alert">
+            @_loadError
+        </div>
+    }
+    else if (_requiresProfile)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h2 class="h5">Student profile required</h2>
+            <p>
+                Create and save your student profile before starting
+                the career assessment.
+            </p>
+            <a class="btn btn-primary" href="/student-profile">
+                Go to Student Profile
+            </a>
+        </div>
+    }
+    else if (_isCompleted)
+    {
+        <div class="alert alert-success" role="status">
+            <h2 class="h5">Assessment completed</h2>
+            <p class="mb-0">
+                Your responses were saved successfully. Refreshing
+                this page will not remove your completed assessment.
+            </p>
+        </div>
 
-<div class="border rounded p-4 text-center text-secondary">
-    No assessment questions available yet.
+        <p>
+            Career recommendations will be generated in a later
+            feature after the recommendation engine is integrated.
+        </p>
+
+        <button type="button"
+                class="btn btn-secondary"
+                @onclick="StartNewAssessmentAsync">
+            Start a new assessment
+        </button>
+    }
+    else if (_session is not null && _questions.Count > 0)
+    {
+        var currentQuestion = _questions[_currentIndex];
+        var totalQuestions = _questions.Count;
+        var progressPercentage = (int)Math.Round(
+            (double)(_currentIndex + 1) / totalQuestions * 100);
+
+        <section class="assessment-card"
+         @key="currentQuestion.Id">
+            <div class="mb-4">
+                <div class="d-flex justify-content-between
+                            align-items-center gap-3 mb-2">
+                    <span class="badge bg-primary">
+                        @currentQuestion.Category
+                    </span>
+                    <span class="text-muted">
+                        Question @(_currentIndex + 1) of @totalQuestions
+                    </span>
+                </div>
+
+                <div class="progress"
+                     role="progressbar"
+                     aria-label="Assessment progress"
+                     aria-valuenow="@(_currentIndex + 1)"
+                     aria-valuemin="1"
+                     aria-valuemax="@totalQuestions">
+                    <div class="progress-bar"
+                         style="width: @(progressPercentage)%">
+                        @progressPercentage%
+                    </div>
+                </div>
+            </div>
+
+            <fieldset class="mb-4"
+                      aria-required="@currentQuestion.IsRequired">
+                <legend class="h5 mb-3">
+                    @currentQuestion.Text
+
+                    @if (currentQuestion.IsRequired)
+                    {
+                        <span class="text-danger"
+                              aria-label="Required">*</span>
+                    }
+                </legend>
+
+                <div role="radiogroup"
+                     aria-label="@currentQuestion.Text">
+                    @foreach (var option in currentQuestion.Options)
+                    {
+                        var isSelected =
+                            _selectedOptionIds.TryGetValue(
+                                currentQuestion.Id,
+                                out var selectedOptionId) &&
+                            selectedOptionId == option.Id;
+
+                        <div class="form-check assessment-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="@($"question-{currentQuestion.Id}")"
+                                   id="@($"option-{option.Id}")"
+                                   checked="@isSelected"
+                                   @onchange="() => SelectOption(
+                                       currentQuestion.Id,
+                                       option.Id)" />
+
+                            <label class="form-check-label"
+                                   for="@($"option-{option.Id}")">
+                                @option.Value
+                            </label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+
+            @if (!string.IsNullOrWhiteSpace(_validationMessage))
+            {
+                <div class="alert alert-danger"
+                     role="alert"
+                     aria-live="assertive">
+                    @_validationMessage
+                </div>
+            }
+
+            <div class="assessment-actions">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        disabled="@(_currentIndex == 0 || _isSubmitting)"
+                        @onclick="GoToPrevious">
+                    Previous
+                </button>
+
+                @if (_currentIndex < totalQuestions - 1)
+                {
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@_isSubmitting"
+                            @onclick="GoToNext">
+                        Next
+                    </button>
+                }
+                else
+                {
+                    <button type="button"
+                            class="btn btn-success"
+                            disabled="@_isSubmitting"
+                            @onclick="SubmitAssessmentAsync">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner-border
+                                         spinner-border-sm me-2"
+                                  aria-hidden="true"></span>
+                        }
+
+                        Submit assessment
+                    </button>
+                }
+            </div>
+        </section>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            No assessment questions are available.
+        </div>
+    }
 </div>
+
+@code {
+    private readonly Dictionary<Guid, Guid> _selectedOptionIds =
+        new();
+
+    private List<AssessmentQuestion> _questions = new();
+    private AssessmentSession? _session;
+    private Guid _studentProfileId;
+    private int _currentIndex;
+    private string _validationMessage = string.Empty;
+    private string _loadError = string.Empty;
+    private bool _isLoading = true;
+    private bool _isCompleted;
+    private bool _isSubmitting;
+    private bool _requiresProfile;
+
+    private const string SessionIdKey =
+        "CurrentAssessmentSessionId";
+
+    protected override void OnInitialized()
+    {
+        _questions = AssessmentService
+            .GetAllQuestions()
+            .OrderBy(question => question.DisplayOrder)
+            .ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await LoadSessionAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadSessionAsync()
+    {
+        try
+        {
+            var availableProfileId =
+                AssessmentService.GetAvailableStudentProfileId();
+
+            if (!availableProfileId.HasValue)
+            {
+                _requiresProfile = true;
+                return;
+            }
+
+            _studentProfileId = availableProfileId.Value;
+
+            var storedSessionId =
+                await SessionStorage.GetAsync<Guid>(SessionIdKey);
+
+            if (storedSessionId.Success &&
+                storedSessionId.Value != Guid.Empty)
+            {
+                var storedSession =
+                    AssessmentService.GetAssessmentSession(
+                        storedSessionId.Value);
+
+                if (storedSession is not null &&
+                    storedSession.StudentProfileId ==
+                    _studentProfileId)
+                {
+                    _session = storedSession;
+                }
+            }
+
+            if (_session is null)
+            {
+                _session =
+                    AssessmentService.CreateAssessmentSession(
+                        _studentProfileId);
+
+                await SessionStorage.SetAsync(
+                    SessionIdKey,
+                    _session.Id);
+            }
+
+            foreach (var response in _session.Responses)
+            {
+                _selectedOptionIds[response.QuestionId] =
+                    response.OptionId;
+            }
+
+            _isCompleted = string.Equals(
+                _session.Status,
+                "Completed",
+                StringComparison.Ordinal);
+        }
+        catch
+        {
+            _loadError =
+                "The assessment could not be loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SelectOption(Guid questionId, Guid optionId)
+    {
+        _selectedOptionIds[questionId] = optionId;
+        _validationMessage = string.Empty;
+    }
+
+    private void GoToNext()
+    {
+        var currentQuestion = _questions[_currentIndex];
+
+        if (!TrySaveCurrentResponse(currentQuestion))
+        {
+            return;
+        }
+
+        _currentIndex++;
+        _validationMessage = string.Empty;
+    }
+
+    private void GoToPrevious()
+    {
+        if (_currentIndex > 0)
+        {
+            _currentIndex--;
+            _validationMessage = string.Empty;
+        }
+    }
+
+    private bool TrySaveCurrentResponse(
+        AssessmentQuestion currentQuestion)
+    {
+        if (!_selectedOptionIds.TryGetValue(
+                currentQuestion.Id,
+                out var optionId))
+        {
+            if (currentQuestion.IsRequired)
+            {
+                _validationMessage =
+                    "This question is required. Select an option " +
+                    "before continuing.";
+                return false;
+            }
+
+            return true;
+        }
+
+        var result = AssessmentService.SubmitResponse(
+            _session!,
+            currentQuestion.Id,
+            optionId);
+
+        if (result.IsValid)
+        {
+            return true;
+        }
+
+        _validationMessage = string.Join(" ", result.Errors);
+        return false;
+    }
+
+    private async Task SubmitAssessmentAsync()
+    {
+        var currentQuestion = _questions[_currentIndex];
+
+        if (!TrySaveCurrentResponse(currentQuestion))
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+
+        try
+        {
+            var completionResult =
+                AssessmentService.CompleteAssessmentSession(
+                    _session!);
+
+            if (!completionResult.IsValid)
+            {
+                _validationMessage =
+                    "The assessment could not be completed: " +
+                    string.Join(" ", completionResult.Errors);
+                return;
+            }
+
+            _isCompleted = true;
+
+            await SessionStorage.SetAsync(
+                SessionIdKey,
+                _session!.Id);
+        }
+        catch
+        {
+            _validationMessage =
+                "The assessment could not be saved. Please try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task StartNewAssessmentAsync()
+    {
+        _isCompleted = false;
+        _currentIndex = 0;
+        _selectedOptionIds.Clear();
+        _validationMessage = string.Empty;
+
+        _session = AssessmentService.CreateAssessmentSession(
+            _studentProfileId);
+
+        await SessionStorage.SetAsync(
+            SessionIdKey,
+            _session.Id);
+    }
+}
