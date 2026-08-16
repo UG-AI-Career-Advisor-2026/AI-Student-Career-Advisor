@@ -3,6 +3,7 @@ using CareerAdvisor.Infrastructure.Data;
 using CareerAdvisor.Infrastructure.Repositories;
 using CareerAdvisor.Infrastructure.Services;
 using CareerAdvisor.Web.Components;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,8 @@ builder.Services.AddSingleton<ICareerRepository>(
     _ => new JsonCareerRepository(careerCatalogPath));
 
 builder.Services.AddScoped<ICareerService, CareerService>();
+builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddScoped<ProtectedSessionStorage>();
 
 var connectionString = builder.Configuration.GetConnectionString(
         "CareerAdvisorDatabase")
@@ -32,6 +35,14 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider
+        .GetRequiredService<CareerAdvisorDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+}
 
 if (!app.Environment.IsDevelopment())
 {
