@@ -1,4 +1,5 @@
 @page "/assessment"
+@page "/career-assessment"
 @rendermode InteractiveServer
 @inject CareerAdvisor.Core.Interfaces.IAssessmentService AssessmentService
 @inject Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedSessionStorage SessionStorage
@@ -58,7 +59,7 @@
                         <input class="form-check-input" type="radio" name="question_@currentQuestion.Id" id="option_@option.Id"
                                checked="@isSelected" @onchange="() => SelectOption(currentQuestion.Id, option.Id)" />
                         <label class="form-check-label" for="option_@option.Id">
-                            @option.Description
+                            @option.Value
                         </label>
                     </div>
                 }
@@ -113,12 +114,24 @@
     // Dummy student profile ID (replace with actual logged-in user ID if you have auth)
     private Guid _studentProfileId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        _isLoading = true;
+        // Safe during prerender: no JavaScript interop here
         _questions = AssessmentService.GetAllQuestions().OrderBy(q => q.DisplayOrder).ToList();
+    }
 
-        // 1. Try to load existing session ID from browser storage to survive page refreshes
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // ProtectedSessionStorage needs JavaScript, so it must run after the first render
+        if (firstRender)
+        {
+            await LoadSessionAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadSessionAsync()
+    {
         var sessionIdResult = await SessionStorage.GetAsync<Guid>(SessionIdKey);
 
         if (sessionIdResult.Success && sessionIdResult.Value != Guid.Empty)
@@ -133,18 +146,15 @@
                 }
                 else
                 {
-                    // Load already answered questions into the UI state
                     var responses = AssessmentService.GetSessionResponses(_session.Id);
                     foreach (var response in responses)
                     {
-                        // ASSUMPTION: AssessmentResponse has a property called OptionId.
                         _selectedOptionIds[response.QuestionId] = response.OptionId;
                     }
                 }
             }
         }
 
-        // 2. Create new session if none exists
         if (_session == null)
         {
             _session = AssessmentService.CreateAssessmentSession(_studentProfileId);
@@ -217,8 +227,7 @@
         if (completionResult.IsValid)
         {
             _isCompleted = true;
-            // Clear storage so a refresh starts fresh or shows the completed state properly
-            await SessionStorage.DeleteAsync(SessionIdKey);
+            await SessionStorage.SetAsync(SessionIdKey, _session!.Id);
         }
         else
         {

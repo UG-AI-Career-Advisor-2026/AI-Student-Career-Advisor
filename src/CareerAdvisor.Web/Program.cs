@@ -20,6 +20,8 @@ builder.Services.AddSingleton<ICareerRepository>(
 
 builder.Services.AddScoped<ICareerService, CareerService>();
 
+builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+
 var connectionString = builder.Configuration.GetConnectionString(
         "CareerAdvisorDatabase")
     ?? throw new InvalidOperationException(
@@ -32,6 +34,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+    scope.ServiceProvider.GetRequiredService<CareerAdvisorDbContext>().Database.EnsureCreated();
 
 if (!app.Environment.IsDevelopment())
 {

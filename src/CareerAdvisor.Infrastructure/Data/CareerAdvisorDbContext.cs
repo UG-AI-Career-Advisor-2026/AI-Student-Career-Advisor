@@ -116,6 +116,8 @@ public class CareerAdvisorDbContext(
             .OnDelete(DeleteBehavior.Restrict);
     }
 
+    public DbSet<AssessmentSession> AssessmentSessions => Set<AssessmentSession>();
+    public DbSet<AssessmentResponse> AssessmentResponses => Set<AssessmentResponse>();
     private static void ConfigureLearningRoadmap(ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<LearningRoadmap>();
