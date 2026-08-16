@@ -1,0 +1,208 @@
+.profile-shell {
+    max-width: 980px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.profile-header {
+    margin-bottom: 1.5rem;
+    padding: 2rem;
+    color: #ffffff;
+    background:
+        linear-gradient(135deg, #173b70 0%, #275ba5 55%, #4d77ba 100%);
+    border-radius: 1.25rem;
+    box-shadow: 0 1rem 2.5rem rgba(23, 59, 112, 0.18);
+}
+
+.profile-header h1 {
+    margin: 0.35rem 0 0.65rem;
+    font-weight: 700;
+}
+
+.profile-header p {
+    max-width: 700px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.profile-kicker {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.profile-panel {
+    margin-bottom: 1.25rem;
+    padding: 1.5rem;
+    background: #ffffff;
+    border: 1px solid #e3e9f2;
+    border-radius: 1rem;
+    box-shadow: 0 0.4rem 1.5rem rgba(25, 45, 75, 0.06);
+}
+
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.section-heading > div {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.section-heading h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #183153;
+}
+
+.section-heading p {
+    max-width: 420px;
+    margin: 0;
+    color: #64748b;
+    text-align: right;
+}
+
+.section-number {
+    display: inline-grid;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    place-items: center;
+    color: #ffffff;
+    font-weight: 700;
+    background: #275ba5;
+    border-radius: 50%;
+}
+
+.collection-entry {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.interest-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.interest-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.7rem 0.5rem 0.85rem;
+    color: #173b70;
+    font-weight: 600;
+    background: #edf4ff;
+    border: 1px solid #cddffd;
+    border-radius: 999px;
+}
+
+.interest-chip button {
+    display: inline-grid;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    place-items: center;
+    color: #173b70;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+}
+
+.interest-chip button:hover,
+.interest-chip button:focus-visible {
+    color: #ffffff;
+    background: #275ba5;
+}
+
+.skill-entry,
+.skill-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
+    align-items: end;
+    gap: 0.75rem;
+}
+
+.skill-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.skill-card {
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px solid #e3e9f2;
+    border-radius: 0.8rem;
+}
+
+.empty-message {
+    margin: 1rem 0 0;
+    padding: 1rem;
+    color: #64748b;
+    text-align: center;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.75rem;
+}
+
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.25rem;
+}
+
+.profile-action-note {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 767.98px) {
+    .profile-header {
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+
+    .profile-panel {
+        padding: 1.15rem;
+    }
+
+    .section-heading {
+        display: block;
+    }
+
+    .section-heading p {
+        margin-top: 0.65rem;
+        text-align: left;
+    }
+
+    .collection-entry,
+    .profile-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .skill-entry,
+    .skill-card {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .collection-entry .btn,
+    .skill-entry .btn,
+    .skill-card .btn,
+    .profile-actions .btn {
+        width: 100%;
+    }
+}

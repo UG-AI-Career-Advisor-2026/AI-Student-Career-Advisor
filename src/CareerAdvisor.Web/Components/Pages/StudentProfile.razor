@@ -1,15 +1,477 @@
 @page "/student-profile"
+@rendermode InteractiveServer
+
+@using CareerAdvisor.Core.Enums
+@using CareerAdvisor.Core.Interfaces
+@using CareerAdvisor.Core.Models
+@using CareerAdvisor.Core.Validators
+
+@inject IStudentProfileRepository ProfileRepository
+@inject StudentProfileValidator ProfileValidator
 
 <PageTitle>CareerIQ – Student Profile</PageTitle>
 
-<h1>Student Profile</h1>
-<p>Your programme of study, interests, and skills will be captured here.</p>
+<div class="profile-shell">
+    <header class="profile-header">
+        <span class="profile-kicker">Your CareerIQ profile</span>
+        <h1>Student Profile</h1>
+        <p>
+            Tell us about your programme, interests and current skills.
+            This information will help CareerIQ personalise your career
+            recommendations.
+        </p>
+    </header>
 
-<PlaceholderNotice>
-    This page is a placeholder. The profile form and data storage have not been
-    built yet.
-</PlaceholderNotice>
+    @if (_isLoading)
+    {
+        <div class="profile-panel text-center" role="status">
+            <div class="spinner-border text-primary" aria-hidden="true"></div>
+            <p class="mt-3 mb-0">Loading your profile…</p>
+        </div>
+    }
+    else
+    {
+        @if (_errors.Count > 0)
+        {
+            <div class="alert alert-danger" role="alert">
+                <strong>Please correct the following:</strong>
+                <ul class="mb-0 mt-2">
+                    @foreach (var error in _errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
 
-<div class="border rounded p-4 text-center text-secondary">
-    No profile information yet.
+        @if (!string.IsNullOrWhiteSpace(_successMessage))
+        {
+            <div class="alert alert-success" role="status">
+                @_successMessage
+            </div>
+        }
+
+        <EditForm Model="_profile" OnSubmit="SaveProfileAsync">
+            <section class="profile-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-number">1</span>
+                        <h2>Academic information</h2>
+                    </div>
+                    <p>Start with your basic university information.</p>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="profile-name">
+                            Full name
+                        </label>
+                        <InputText id="profile-name"
+                                   class="form-control"
+                                   @bind-Value="_profile.Name"
+                                   placeholder="e.g. Ama Mensah" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="profile-programme">
+                            Programme
+                        </label>
+                        <InputText id="profile-programme"
+                                   class="form-control"
+                                   @bind-Value="_profile.Programme"
+                                   placeholder="e.g. Computer Science" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="academic-level">
+                            Academic level
+                        </label>
+                        <InputSelect id="academic-level"
+                                     class="form-select"
+                                     @bind-Value="_profile.AcademicLevel">
+                            @foreach (var level in Enum.GetValues<AcademicLevel>())
+                            {
+                                <option value="@level">
+                                    @FormatAcademicLevel(level)
+                                </option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+            </section>
+
+            <section class="profile-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-number">2</span>
+                        <h2>Career interests</h2>
+                    </div>
+                    <p>Add at least one area that interests you.</p>
+                </div>
+
+                <div class="collection-entry">
+                    <div class="flex-grow-1">
+                        <label class="form-label" for="new-interest">
+                            New interest
+                        </label>
+                        <input id="new-interest"
+                               class="form-control"
+                               @bind="_newInterest"
+                               @bind:event="oninput"
+                               placeholder="e.g. Artificial Intelligence" />
+                    </div>
+
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="AddInterest">
+                        Add interest
+                    </button>
+                </div>
+
+                @if (_profile.Interests.Count == 0)
+                {
+                    <p class="empty-message">
+                        No interests added yet.
+                    </p>
+                }
+                else
+                {
+                    <div class="interest-list"
+                         aria-label="Selected career interests">
+                        @foreach (var interest in _profile.Interests)
+                        {
+                            <span class="interest-chip">
+                                @interest
+                                <button type="button"
+                                        title="Remove @interest"
+                                        aria-label="Remove @interest"
+                                        @onclick="() => RemoveInterest(interest)">
+                                    ×
+                                </button>
+                            </span>
+                        }
+                    </div>
+                }
+            </section>
+
+            <section class="profile-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-number">3</span>
+                        <h2>Skills and proficiency</h2>
+                    </div>
+                    <p>
+                        Add your current skills and select an honest
+                        proficiency level for each one.
+                    </p>
+                </div>
+
+                <div class="skill-entry">
+                    <div class="skill-name-field">
+                        <label class="form-label" for="new-skill">
+                            Skill
+                        </label>
+                        <input id="new-skill"
+                               class="form-control"
+                               @bind="_newSkillName"
+                               @bind:event="oninput"
+                               placeholder="e.g. C# programming" />
+                    </div>
+
+                    <div class="skill-level-field">
+                        <label class="form-label" for="new-skill-level">
+                            Proficiency
+                        </label>
+                        <InputSelect id="new-skill-level"
+                                     class="form-select"
+                                     @bind-Value="_newSkillProficiency">
+                            @foreach (var level in
+                                Enum.GetValues<SkillProficiency>())
+                            {
+                                <option value="@level">@level</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="AddSkill">
+                        Add skill
+                    </button>
+                </div>
+
+                @if (_profile.Skills.Count == 0)
+                {
+                    <p class="empty-message">
+                        No skills added yet.
+                    </p>
+                }
+                else
+                {
+                    <div class="skill-list">
+                        @foreach (var skill in _profile.Skills)
+                        {
+                            <div class="skill-card" @key="skill.Id">
+                                <div class="skill-name-field">
+                                    <label class="form-label"
+                                           for="@($"skill-{skill.Id}")">
+                                        Skill
+                                    </label>
+                                    <InputText id="@($"skill-{skill.Id}")"
+                                               class="form-control"
+                                               @bind-Value="skill.SkillName" />
+                                </div>
+
+                                <div class="skill-level-field">
+                                    <label class="form-label"
+                                           for="@($"level-{skill.Id}")">
+                                        Proficiency
+                                    </label>
+                                    <InputSelect id="@($"level-{skill.Id}")"
+                                                 class="form-select"
+                                                 @bind-Value="skill.Proficiency">
+                                        @foreach (var level in
+                                            Enum.GetValues<SkillProficiency>())
+                                        {
+                                            <option value="@level">@level</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <button type="button"
+                                        class="btn btn-outline-danger"
+                                        @onclick="() => RemoveSkill(skill)">
+                                    Remove
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <div class="profile-actions">
+                <button type="submit"
+                        class="btn btn-primary btn-lg"
+                        disabled="@_isSaving">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"
+                              aria-hidden="true"></span>
+                    }
+
+                    @(_isExistingProfile
+                        ? "Update profile"
+                        : "Save profile")
+                </button>
+
+                <span class="profile-action-note">
+                    Your information is stored locally for this MVP.
+                </span>
+            </div>
+        </EditForm>
+    }
 </div>
+
+@code {
+    private CareerAdvisor.Core.Models.StudentProfile _profile =
+        CreateEmptyProfile();
+
+    private readonly List<string> _errors = new();
+    private string _newInterest = string.Empty;
+    private string _newSkillName = string.Empty;
+    private SkillProficiency _newSkillProficiency =
+        SkillProficiency.Beginner;
+
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isExistingProfile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profiles = await ProfileRepository.GetAllAsync();
+            var existingProfile = profiles.FirstOrDefault();
+
+            if (existingProfile is not null)
+            {
+                _profile = existingProfile;
+                _isExistingProfile = true;
+            }
+        }
+        catch
+        {
+            _errors.Add(
+                "Your profile could not be loaded. Please try again.");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void AddInterest()
+    {
+        ClearMessages();
+
+        var interest = _newInterest.Trim();
+
+        if (string.IsNullOrWhiteSpace(interest))
+        {
+            _errors.Add("Enter an interest before adding it.");
+            return;
+        }
+
+        if (_profile.Interests.Any(existing =>
+                string.Equals(
+                    existing.Trim(),
+                    interest,
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            _errors.Add("That interest has already been added.");
+            return;
+        }
+
+        _profile.Interests.Add(interest);
+        _newInterest = string.Empty;
+    }
+
+    private void RemoveInterest(string interest)
+    {
+        ClearMessages();
+        _profile.Interests.Remove(interest);
+    }
+
+    private void AddSkill()
+    {
+        ClearMessages();
+
+        var skillName = _newSkillName.Trim();
+
+        if (string.IsNullOrWhiteSpace(skillName))
+        {
+            _errors.Add("Enter a skill before adding it.");
+            return;
+        }
+
+        if (_profile.Skills.Any(skill =>
+                string.Equals(
+                    skill.SkillName.Trim(),
+                    skillName,
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            _errors.Add("That skill has already been added.");
+            return;
+        }
+
+        _profile.Skills.Add(new StudentSkill
+        {
+            SkillName = skillName,
+            Proficiency = _newSkillProficiency,
+            StudentProfileId = _profile.Id
+        });
+
+        _newSkillName = string.Empty;
+        _newSkillProficiency = SkillProficiency.Beginner;
+    }
+
+    private void RemoveSkill(StudentSkill skill)
+    {
+        ClearMessages();
+        _profile.Skills.Remove(skill);
+    }
+
+    private async Task SaveProfileAsync(EditContext _)
+    {
+        ClearMessages();
+        NormaliseProfile();
+
+        var validationResult = ProfileValidator.Validate(_profile);
+
+        if (!validationResult.IsValid)
+        {
+            _errors.AddRange(validationResult.Errors);
+            return;
+        }
+
+        _isSaving = true;
+        var wasExistingProfile = _isExistingProfile;
+
+        try
+        {
+            if (wasExistingProfile)
+            {
+                await ProfileRepository.UpdateAsync(_profile);
+            }
+            else
+            {
+                await ProfileRepository.AddAsync(_profile);
+                _isExistingProfile = true;
+            }
+
+            var refreshedProfile =
+                await ProfileRepository.GetByIdAsync(_profile.Id);
+
+            if (refreshedProfile is not null)
+            {
+                _profile = refreshedProfile;
+            }
+
+            _successMessage = wasExistingProfile
+                ? "Your profile was updated successfully."
+                : "Your profile was saved successfully.";
+        }
+        catch
+        {
+            _errors.Add(
+                "Your profile could not be saved. Please try again.");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void NormaliseProfile()
+    {
+        _profile.Name = _profile.Name.Trim();
+        _profile.Programme = _profile.Programme.Trim();
+
+        _profile.Interests = _profile.Interests
+            .Select(interest => interest.Trim())
+            .Where(interest => !string.IsNullOrWhiteSpace(interest))
+            .ToList();
+
+        foreach (var skill in _profile.Skills)
+        {
+            skill.SkillName = skill.SkillName.Trim();
+            skill.StudentProfileId = _profile.Id;
+        }
+    }
+
+    private void ClearMessages()
+    {
+        _errors.Clear();
+        _successMessage = null;
+    }
+
+    private static string FormatAcademicLevel(AcademicLevel level)
+    {
+        return level switch
+        {
+            AcademicLevel.HighSchool => "High school",
+            AcademicLevel.PostGraduate => "Postgraduate",
+            _ => level.ToString()
+        };
+    }
+
+    private static CareerAdvisor.Core.Models.StudentProfile
+        CreateEmptyProfile()
+    {
+        return new CareerAdvisor.Core.Models.StudentProfile
+        {
+            AcademicLevel = AcademicLevel.Undergraduate
+        };
+    }
+}
