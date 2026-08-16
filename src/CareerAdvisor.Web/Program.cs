@@ -1,3 +1,4 @@
+using CareerAdvisor.Core.Validators;
 using CareerAdvisor.Core.Interfaces;
 using CareerAdvisor.Infrastructure.Data;
 using CareerAdvisor.Infrastructure.Repositories;
@@ -21,6 +22,8 @@ builder.Services.AddSingleton<ICareerRepository>(
 
 builder.Services.AddScoped<ICareerService, CareerService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddScoped<IStudentProfileRepository, StudentProfileRepository>();
+builder.Services.AddScoped<StudentProfileValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 
 var connectionString = builder.Configuration.GetConnectionString(
