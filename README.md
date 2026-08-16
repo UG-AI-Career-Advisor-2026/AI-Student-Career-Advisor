@@ -1,81 +1,135 @@
-# AI-Powered Student Career Advisor
+# CareerIQ – AI-Powered Student Career Advisor
 
-## Project Overview
+CareerIQ is a university semester project that helps students explore technology careers using their profile, skills, interests and career-assessment responses.
 
-AI-Powered Student Career Advisor is a university team project focused on helping students and recent graduates explore suitable technology careers. The application will guide users through profile setup, a structured assessment, and AI-assisted career recommendations that explain why a path may be a strong fit.
+The project is built with .NET 10, Blazor, EF Core, SQLite, ML.NET, xUnit and GitHub Actions.
 
-## Problem Being Solved
+## Development Status
 
-Many students understand their academic subjects better than the technology roles available to them after graduation. They may not know how their interests, strengths, and current skills connect to careers such as software development, cloud engineering, or cybersecurity. This project aims to provide a clear starting point by translating student information into practical career guidance and learning direction.
+CareerIQ is still under active development. Sprint 2 provides the student-profile and career-assessment foundation; it does not complete the full MVP.
 
-## MVP Features
+Currently implemented:
 
-- Student profile creation and editing
-- Career assessment questionnaire
-- Top three AI-generated career recommendations with confidence scores
-- Explanation of why each career was recommended
-- Skill-gap analysis for a selected career
-- Personalised learning roadmap
-- Recommendation history
+- Create, save, reopen and edit a student profile
+- Record interests, skills and proficiency levels
+- Prevent duplicate interests and skills
+- Complete a 15-question career assessment
+- Preserve answers while navigating between questions
+- Reject incomplete assessments
+- Save completed assessments in SQLite
+- Load all eight supported careers from the career catalogue
 
-## Technology Stack
+The eight careers are Software Developer, Data Analyst, Cybersecurity Analyst, Cloud Engineer, Network Administrator, Database Administrator, UI/UX Designer and AI/ML Engineer.
 
-- .NET 10
-- Blazor Web App with Server interactivity
-- ASP.NET Core
-- ML.NET
-- Entity Framework Core
-- SQLite for development
-- xUnit for testing
+## Setup
 
-## Solution Structure
+### Requirements
 
-- `CareerAdvisor.Core`: domain models, interfaces, validation rules, and core business logic
-- `CareerAdvisor.Infrastructure`: EF Core, SQLite, ML.NET model loading, data storage, and service implementations
-- `CareerAdvisor.Web`: Blazor UI, dependency injection, and user interactions
-- `CareerAdvisor.Tests`: automated tests for Core and Infrastructure
-
-## Prerequisites
-
-- .NET 10 SDK
-- A local development environment capable of running ASP.NET Core applications
 - Git
+- .NET 10 SDK
+- A modern web browser
 
-## Commands
-
-Restore dependencies:
+Clone and enter the repository:
 
 ```bash
+git clone https://github.com/UG-AI-Career-Advisor-2026/AI-Student-Career-Advisor.git
+cd AI-Student-Career-Advisor
+```
+
+Restore tools and dependencies:
+
+```bash
+dotnet tool restore
 dotnet restore CareerAdvisor.sln
 ```
 
-Build the solution:
+Build and test the solution:
 
 ```bash
-dotnet build CareerAdvisor.sln
+dotnet build CareerAdvisor.sln --configuration Release
+dotnet test CareerAdvisor.sln --configuration Release
 ```
 
-Run automated tests:
-
-```bash
-dotnet test CareerAdvisor.sln
-```
-
-Run the web application:
+Run the application:
 
 ```bash
 dotnet run --project src/CareerAdvisor.Web/CareerAdvisor.Web.csproj
 ```
 
-## Development Status
+Open the local address displayed in the terminal. Create a student profile before starting an assessment.
 
-The repository is currently in initial setup and documentation planning. The MVP scope, architecture direction, and contribution workflow are defined here, but the full application functionality described in this document should be treated as planned work rather than completed implementation.
+Stop the application with `Ctrl+C`.
 
-## Short Roadmap
+## Database and Migrations
 
-- Establish the initial solution structure and project references
-- Define domain models, interfaces, and validation rules in `CareerAdvisor.Core`
-- Implement persistence and service integrations in `CareerAdvisor.Infrastructure`
-- Build the student workflow in the Blazor web application
-- Add automated tests for core logic and infrastructure behavior
-- Refine recommendation quality, explanations, and learning roadmap output
+CareerIQ uses SQLite. The local database is created automatically when the application starts because pending EF Core migrations are applied during startup.
+
+The default database file is:
+
+```text
+src/CareerAdvisor.Web/career-advisor.db
+```
+
+List available migrations:
+
+```bash
+dotnet ef migrations list \
+  --project src/CareerAdvisor.Infrastructure \
+  --startup-project src/CareerAdvisor.Web
+```
+
+Apply migrations manually:
+
+```bash
+dotnet ef database update \
+  --project src/CareerAdvisor.Infrastructure \
+  --startup-project src/CareerAdvisor.Web
+```
+
+SQLite database files are ignored by Git using:
+
+```text
+*.db
+*.db-shm
+*.db-wal
+```
+
+## Current Limitations
+
+- There are no user accounts or authentication.
+- The application is intended for local development and demonstration.
+- The career catalogue is a static, read-only JSON file.
+- The assessment uses the most recently updated student profile.
+- Recommendation generation and ML.NET prediction are not yet integrated.
+- No recommendations or confidence scores are fabricated.
+- Skill-gap analysis, learning roadmaps and recommendation history are not yet implemented.
+- The sample ML.NET dataset is synthetic and is not suitable for real-world career decisions.
+
+## Planned Work
+
+The remaining project work includes:
+
+- Recommendation generation and ML.NET integration
+- Exactly three ranked recommendations
+- Confidence scores and plain-language explanations
+- Skill-gap analysis
+- Personalised learning roadmaps
+- Recommendation history
+- Final integration, testing, demonstration and presentation preparation
+
+Detailed GitHub issues for the next sprint will be created after the Sprint 2 integration review.
+
+## Contribution Workflow
+
+Never work directly on `main`. Create one branch per issue and open a pull request.
+
+Before opening a pull request, run:
+
+```bash
+git diff --check
+dotnet build CareerAdvisor.sln --configuration Release
+dotnet test CareerAdvisor.sln --configuration Release
+git status
+```
+
+Pull requests must pass CI, receive at least one approval and use squash-and-merge. Include `Closes #<issue-number>` in the pull-request description.
