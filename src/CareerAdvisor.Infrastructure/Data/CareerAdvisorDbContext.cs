@@ -7,11 +7,20 @@ public class CareerAdvisorDbContext(
     DbContextOptions<CareerAdvisorDbContext> options)
     : DbContext(options)
 {
-    public DbSet<StudentProfile> StudentProfiles => Set<StudentProfile>();
+    public DbSet<StudentProfile> StudentProfiles =>
+        Set<StudentProfile>();
 
-    public DbSet<StudentSkill> StudentSkills => Set<StudentSkill>();
+    public DbSet<StudentSkill> StudentSkills =>
+        Set<StudentSkill>();
 
-    public DbSet<CareerProfile> CareerProfiles => Set<CareerProfile>();
+    public DbSet<AssessmentSession> AssessmentSessions =>
+        Set<AssessmentSession>();
+
+    public DbSet<AssessmentResponse> AssessmentResponses =>
+        Set<AssessmentResponse>();
+
+    public DbSet<CareerProfile> CareerProfiles =>
+        Set<CareerProfile>();
 
     public DbSet<RecommendationSession> RecommendationSessions =>
         Set<RecommendationSession>();
@@ -22,7 +31,8 @@ public class CareerAdvisorDbContext(
     public DbSet<LearningRoadmap> LearningRoadmaps =>
         Set<LearningRoadmap>();
 
-    public DbSet<RoadmapStep> RoadmapSteps => Set<RoadmapStep>();
+    public DbSet<RoadmapStep> RoadmapSteps =>
+        Set<RoadmapStep>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +40,8 @@ public class CareerAdvisorDbContext(
 
         ConfigureStudentProfile(modelBuilder);
         ConfigureStudentSkill(modelBuilder);
+        ConfigureAssessmentSession(modelBuilder);
+        ConfigureAssessmentResponse(modelBuilder);
         ConfigureCareerProfile(modelBuilder);
         ConfigureRecommendationSession(modelBuilder);
         ConfigureCareerRecommendation(modelBuilder);
@@ -37,7 +49,8 @@ public class CareerAdvisorDbContext(
         ConfigureRoadmapStep(modelBuilder);
     }
 
-    private static void ConfigureStudentProfile(ModelBuilder modelBuilder)
+    private static void ConfigureStudentProfile(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<StudentProfile>();
 
@@ -57,7 +70,8 @@ public class CareerAdvisorDbContext(
             .OnDelete(DeleteBehavior.Cascade);
     }
 
-    private static void ConfigureStudentSkill(ModelBuilder modelBuilder)
+    private static void ConfigureStudentSkill(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<StudentSkill>();
 
@@ -68,7 +82,45 @@ public class CareerAdvisorDbContext(
             .HasMaxLength(100);
     }
 
-    private static void ConfigureCareerProfile(ModelBuilder modelBuilder)
+    private static void ConfigureAssessmentSession(
+        ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<AssessmentSession>();
+
+        entity.HasKey(session => session.Id);
+
+        entity.Property(session => session.Status)
+            .IsRequired()
+            .HasMaxLength(20);
+
+        entity.HasOne<StudentProfile>()
+            .WithMany()
+            .HasForeignKey(session => session.StudentProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasMany(session => session.Responses)
+            .WithOne()
+            .HasForeignKey(response => response.AssessmentSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+
+    private static void ConfigureAssessmentResponse(
+        ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<AssessmentResponse>();
+
+        entity.HasKey(response => response.Id);
+
+        entity.HasIndex(response => new
+            {
+                response.AssessmentSessionId,
+                response.QuestionId
+            })
+            .IsUnique();
+    }
+
+    private static void ConfigureCareerProfile(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<CareerProfile>();
 
@@ -83,7 +135,8 @@ public class CareerAdvisorDbContext(
             .HasMaxLength(1000);
     }
 
-    private static void ConfigureRecommendationSession(ModelBuilder modelBuilder)
+    private static void ConfigureRecommendationSession(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<RecommendationSession>();
 
@@ -100,7 +153,8 @@ public class CareerAdvisorDbContext(
             .OnDelete(DeleteBehavior.Cascade);
     }
 
-    private static void ConfigureCareerRecommendation(ModelBuilder modelBuilder)
+    private static void ConfigureCareerRecommendation(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<CareerRecommendation>();
 
@@ -112,13 +166,13 @@ public class CareerAdvisorDbContext(
 
         entity.HasOne(recommendation => recommendation.Career)
             .WithMany()
-            .HasForeignKey(recommendation => recommendation.CareerProfileId)
+            .HasForeignKey(recommendation =>
+                recommendation.CareerProfileId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 
-    public DbSet<AssessmentSession> AssessmentSessions => Set<AssessmentSession>();
-    public DbSet<AssessmentResponse> AssessmentResponses => Set<AssessmentResponse>();
-    private static void ConfigureLearningRoadmap(ModelBuilder modelBuilder)
+    private static void ConfigureLearningRoadmap(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<LearningRoadmap>();
 
@@ -140,7 +194,8 @@ public class CareerAdvisorDbContext(
             .OnDelete(DeleteBehavior.Cascade);
     }
 
-    private static void ConfigureRoadmapStep(ModelBuilder modelBuilder)
+    private static void ConfigureRoadmapStep(
+        ModelBuilder modelBuilder)
     {
         var entity = modelBuilder.Entity<RoadmapStep>();
 

@@ -17,6 +17,12 @@ public interface IAssessmentService
     AssessmentSession CreateAssessmentSession(Guid studentProfileId);
 
     /// <summary>
+/// Gets the most recently updated student profile available
+/// for the single-user MVP.
+/// </summary>
+Guid? GetAvailableStudentProfileId();
+
+    /// <summary>
     /// Gets all available assessment questions.
     /// </summary>
     /// <returns>A list of all AssessmentQuestion objects.</returns>

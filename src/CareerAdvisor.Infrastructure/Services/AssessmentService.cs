@@ -7,85 +7,205 @@ using Microsoft.EntityFrameworkCore;
 namespace CareerAdvisor.Infrastructure.Services;
 
 /// <summary>
-/// EF Core / SQLite-backed implementation of IAssessmentService.
+/// SQLite-backed implementation of the assessment workflow.
 /// </summary>
-public class AssessmentService : IAssessmentService
+public sealed class AssessmentService : IAssessmentService
 {
     private readonly CareerAdvisorDbContext _db;
     private readonly AssessmentValidator _validator = new();
 
-    public AssessmentService(CareerAdvisorDbContext db) => _db = db;
-
-    public AssessmentSession CreateAssessmentSession(Guid studentProfileId)
+    public AssessmentService(CareerAdvisorDbContext db)
     {
-        var session = new AssessmentSession { StudentProfileId = studentProfileId };
+        _db = db;
+    }
+
+    public AssessmentSession CreateAssessmentSession(
+        Guid studentProfileId)
+    {
+        if (studentProfileId == Guid.Empty ||
+            !_db.StudentProfiles.Any(profile =>
+                profile.Id == studentProfileId))
+        {
+            throw new InvalidOperationException(
+                "A valid student profile is required before starting " +
+                "an assessment.");
+        }
+
+        var session = new AssessmentSession
+        {
+            StudentProfileId = studentProfileId
+        };
+
         _db.AssessmentSessions.Add(session);
         _db.SaveChanges();
+
         return session;
     }
 
-    public List<AssessmentQuestion> GetAllQuestions() =>
-        AssessmentQuestionBank.GetAllQuestions();
-
-    public AssessmentQuestion? GetQuestion(Guid questionId) =>
-        AssessmentQuestionBank.GetAllQuestions().FirstOrDefault(q => q.Id == questionId);
-
-    public AssessmentSession? GetAssessmentSession(Guid sessionId) =>
-        _db.AssessmentSessions
-            .Include(s => s.Responses)
-            .FirstOrDefault(s => s.Id == sessionId);
-
-    public ValidationResult SubmitResponse(AssessmentSession session, Guid questionId, Guid optionId)
+    public Guid? GetAvailableStudentProfileId()
     {
-        var result = _validator.ValidateResponse(session, questionId, optionId, GetAllQuestions());
-        if (!result.IsValid) return result;
+        return _db.StudentProfiles
+            .AsNoTracking()
+            .OrderByDescending(profile => profile.UpdatedAt)
+            .Select(profile => (Guid?)profile.Id)
+            .FirstOrDefault();
+    }
 
-        var existing = _db.AssessmentResponses
-            .FirstOrDefault(r => r.AssessmentSessionId == session.Id && r.QuestionId == questionId);
+    public List<AssessmentQuestion> GetAllQuestions()
+    {
+        return AssessmentQuestionBank.GetAllQuestions();
+    }
 
-        if (existing is null)
+    public AssessmentQuestion? GetQuestion(Guid questionId)
+    {
+        return AssessmentQuestionBank.GetAllQuestions()
+            .FirstOrDefault(question => question.Id == questionId);
+    }
+
+    public AssessmentSession? GetAssessmentSession(Guid sessionId)
+    {
+        return _db.AssessmentSessions
+            .AsNoTracking()
+            .Include(session => session.Responses)
+            .SingleOrDefault(session => session.Id == sessionId);
+    }
+
+    public ValidationResult SubmitResponse(
+        AssessmentSession session,
+        Guid questionId,
+        Guid optionId)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        var persistedSession = _db.AssessmentSessions
+            .Include(item => item.Responses)
+            .SingleOrDefault(item => item.Id == session.Id);
+
+        if (persistedSession is null)
         {
-            _db.AssessmentResponses.Add(new AssessmentResponse
+            return Invalid(
+                "The assessment session could not be found.");
+        }
+
+        if (!string.Equals(
+                persistedSession.Status,
+                "InProgress",
+                StringComparison.Ordinal))
+        {
+            return Invalid(
+                "Responses cannot be changed after the assessment " +
+                "has been completed.");
+        }
+
+        var existingResponse = persistedSession.Responses
+            .SingleOrDefault(response =>
+                response.QuestionId == questionId);
+
+        // Exclude the response being edited so the core validator can
+        // still reject genuine duplicate responses while allowing an
+        // existing answer to be changed.
+        var validationSession = new AssessmentSession
+        {
+            Id = persistedSession.Id,
+            StudentProfileId = persistedSession.StudentProfileId,
+            Status = persistedSession.Status,
+            StartedAt = persistedSession.StartedAt,
+            CompletedAt = persistedSession.CompletedAt,
+            Responses = persistedSession.Responses
+                .Where(response =>
+                    response.QuestionId != questionId)
+                .ToList()
+        };
+
+        var result = _validator.ValidateResponse(
+            validationSession,
+            questionId,
+            optionId,
+            GetAllQuestions());
+
+        if (!result.IsValid)
+        {
+            return result;
+        }
+
+        if (existingResponse is null)
+        {
+            var response = new AssessmentResponse
             {
-                AssessmentSessionId = session.Id,
+                AssessmentSessionId = persistedSession.Id,
                 QuestionId = questionId,
                 OptionId = optionId,
                 RespondedAt = DateTime.UtcNow
-            });
+            };
+
+            _db.AssessmentResponses.Add(response);
         }
         else
         {
-            existing.OptionId = optionId;
-            existing.RespondedAt = DateTime.UtcNow;
+            existingResponse.OptionId = optionId;
+            existingResponse.RespondedAt = DateTime.UtcNow;
         }
 
         _db.SaveChanges();
         return result;
     }
 
-    public ValidationResult CompleteAssessmentSession(AssessmentSession session)
+    public ValidationResult CompleteAssessmentSession(
+        AssessmentSession session)
     {
-        var result = _validator.ValidateSessionCompletion(session, GetAllQuestions());
-        if (!result.IsValid) return result;
+        ArgumentNullException.ThrowIfNull(session);
 
-        var entity = _db.AssessmentSessions
-            .FirstOrDefault(s => s.Id == session.Id);
+        var persistedSession = _db.AssessmentSessions
+            .Include(item => item.Responses)
+            .SingleOrDefault(item => item.Id == session.Id);
 
-        if (entity is null)
+        if (persistedSession is null)
         {
-            _db.AssessmentSessions.Add(session);
+            return Invalid(
+                "The assessment session could not be found.");
         }
-        else
+
+        var result = _validator.ValidateSessionCompletion(
+            persistedSession,
+            GetAllQuestions());
+
+        if (!result.IsValid)
         {
-            entity.Status = "Completed";
-            entity.CompletedAt = DateTime.UtcNow;
-            entity.StudentProfileId = session.StudentProfileId;
+            return result;
         }
+
+        var completedAt = DateTime.UtcNow;
+
+        persistedSession.Status = "Completed";
+        persistedSession.CompletedAt = completedAt;
 
         _db.SaveChanges();
+
+        session.Status = "Completed";
+        session.CompletedAt = completedAt;
+
         return result;
     }
 
-    public List<AssessmentResponse> GetSessionResponses(Guid sessionId) =>
-        _db.AssessmentResponses.Where(r => r.AssessmentSessionId == sessionId).ToList();
+    public List<AssessmentResponse> GetSessionResponses(
+        Guid sessionId)
+    {
+        return _db.AssessmentResponses
+            .AsNoTracking()
+            .Where(response =>
+                response.AssessmentSessionId == sessionId)
+            .OrderBy(response => response.RespondedAt)
+            .ToList();
+    }
+
+    private static ValidationResult Invalid(string error)
+    {
+        var result = new ValidationResult
+        {
+            IsValid = false
+        };
+
+        result.Errors.Add(error);
+        return result;
+    }
 }
