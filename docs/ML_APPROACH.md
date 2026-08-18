@@ -1,160 +1,154 @@
-# ML.NET Career Recommendation Approach
+# CareerIQ Recommendation Feature and ML Approach
 
-## 1. Purpose
+## Purpose
 
-This document defines the proposed machine-learning approach for the AI Student Career Advisor. It is a design document for the MVP and does not implement or train the final model.
+CareerIQ will use ML.NET multiclass classification to rank the eight supported technology careers from a student's saved profile and completed career assessment.
 
-The model will analyse a student's academic background, self-assessed skills, interests and questionnaire responses. It will then recommend the three most suitable careers from the eight careers supported by the MVP.
+This document defines the stable feature contract used by the recommendation workflow. It does not train a model or generate recommendations.
 
-The first sample dataset is synthetic and exists only to demonstrate the expected data structure. It must not be treated as real evidence about students or career suitability.
+## Current Status
 
-## 2. Prediction Problem
+The recommendation feature schema and synthetic training dataset are ready for later ML.NET integration.
 
-The recommendation task will be treated as a multiclass classification problem. Each training row represents a student profile, and the target label represents the career that best matches that profile.
+The application does not currently generate career recommendations or confidence scores. Recommendation generation will be implemented in a later Sprint 3 issue.
 
-Although the model predicts one primary class internally, the application will examine the probability scores for all eight classes. The three careers with the highest scores will be presented as the student's top three recommendations.
+## Supported Career Labels
 
-The scores will support ranking and user-friendly confidence values. They must not be presented as guarantees that a student will succeed in a particular career.
+| Career catalogue code | ML label |
+|---|---|
+| `SD-001` | Software Developer |
+| `DA-002` | Data Analyst |
+| `CS-003` | Cybersecurity Analyst |
+| `CE-004` | Cloud Engineer |
+| `NA-005` | Network Administrator |
+| `DBA-006` | Database Administrator |
+| `UX-007` | UI/UX Designer |
+| `AI-008` | AI/ML Engineer |
 
-## 3. Supported Career Labels
+These mappings must remain stable because the ML output label must resolve to an existing career in `data/career-catalog.json`.
 
-The model will use the following eight career labels:
+## ML Input Columns
 
-1. Software Developer
-2. Data Analyst
-3. Cybersecurity Analyst
-4. Cloud Engineer
-5. Network Administrator
-6. Database Administrator
-7. UI/UX Designer
-8. AI/ML Engineer
+The dataset contains the following 26 columns:
 
-These labels must remain consistent across the dataset, career catalogue, domain models and user interface.
+### Profile columns
 
-## 4. Input Features
+- `AcademicBackground`
+- `AcademicLevel`
+- `ProgrammingSkill`
+- `DataSkill`
+- `CybersecuritySkill`
+- `CloudSkill`
+- `NetworkingSkill`
+- `DatabaseSkill`
+- `DesignSkill`
+- `AISkill`
 
-The proposed dataset combines student profile information with questionnaire responses.
+### Assessment columns
 
-| Column | Type | Description |
+- `TechnologyInterest`
+- `DataInterest`
+- `DesignInterest`
+- `LeadershipInterest`
+- `SocialImpactInterest`
+- `ProgrammingSelfAssessment`
+- `CommunicationSelfAssessment`
+- `ProblemSolvingSelfAssessment`
+- `CollaborationSelfAssessment`
+- `LearningAgility`
+- `PreferredEnvironment`
+- `PreferredPace`
+- `StabilityPreference`
+- `CompensationPreference`
+- `IndustryPreference`
+
+### Output column
+
+- `CareerLabel`
+
+## Student Profile Mapping
+
+The student's name, identifiers and timestamps are not ML features.
+
+| Profile information | ML mapping |
+|---|---|
+| Programme | `AcademicBackground` |
+| Academic level | `AcademicLevel` |
+| Interests and programming-related skills | `ProgrammingSkill` |
+| Interests and data-related skills | `DataSkill` |
+| Interests and security-related skills | `CybersecuritySkill` |
+| Interests and cloud-related skills | `CloudSkill` |
+| Interests and networking-related skills | `NetworkingSkill` |
+| Interests and database-related skills | `DatabaseSkill` |
+| Interests and design-related skills | `DesignSkill` |
+| Interests and AI/ML-related skills | `AISkill` |
+
+Programme values are trimmed and normalized before being used as categorical values. Academic level uses the corresponding `AcademicLevel` enum name.
+
+Interest and skill text is matched case-insensitively using whole words or recognized phrases from `RecommendationFeatureSchema.ProfileDomainKeywordsByColumn`. Arbitrary substring matching must not be used.
+
+### Profile-domain scoring
+
+Each profile-domain column uses the documented 1–5 scale:
+
+| Evidence | Numeric value |
+|---|---:|
+| No matching interest or skill | 1 |
+| Matching skill at Beginner proficiency | 2 |
+| Matching interest without a matching skill | 3 |
+| Matching skill at Intermediate proficiency | 3 |
+| Matching skill at Advanced proficiency | 4 |
+| Matching skill at Expert proficiency | 5 |
+
+When both an interest and skill match the same domain, the higher applicable value is used.
+
+## Assessment Question Mapping
+
+Every one of the 15 assessment questions maps to exactly one ML input column.
+
+| Question code | ML column | Value type |
 |---|---|---|
-| AcademicBackground | Categorical text | The student's main academic background, such as ComputerScience, InformationTechnology or Statistics. |
-| ProgrammingLevel | Numeric | Self-assessed programming ability. |
-| DataAnalysisLevel | Numeric | Ability and interest in analysing and interpreting data. |
-| CybersecurityInterest | Numeric | Interest in protecting systems, investigating threats and managing security risks. |
-| CloudInterest | Numeric | Interest in cloud platforms, deployment and scalable infrastructure. |
-| NetworkingLevel | Numeric | Understanding of computer networks and network administration. |
-| DatabaseLevel | Numeric | Understanding of databases, SQL and data management. |
-| DesignInterest | Numeric | Interest in interface design and user experience. |
-| AIInterest | Numeric | Interest in artificial intelligence and machine learning. |
-| MathematicsLevel | Numeric | Confidence in mathematics, statistics and quantitative reasoning. |
-| ProblemSolving | Numeric | Preference and ability for solving technical or analytical problems. |
-| Creativity | Numeric | Preference for creative thinking and producing original solutions. |
-| AttentionToDetail | Numeric | Ability to notice errors, patterns and small but important details. |
-| PreferredWorkStyle | Categorical text | Preferred working style, such as Independent, Collaborative, Structured, Creative or Research. |
-| CareerLabel | Target label | The career associated with the representative profile. |
+| `Q1_INT_TECH` | `TechnologyInterest` | Numeric |
+| `Q2_INT_DATA` | `DataInterest` | Numeric |
+| `Q3_INT_CREA` | `DesignInterest` | Numeric |
+| `Q4_INT_MGMT` | `LeadershipInterest` | Numeric |
+| `Q5_INT_SOCIAL` | `SocialImpactInterest` | Numeric |
+| `Q6_SKILL_PROG` | `ProgrammingSelfAssessment` | Numeric |
+| `Q7_SKILL_COMM` | `CommunicationSelfAssessment` | Numeric |
+| `Q8_SKILL_PROB` | `ProblemSolvingSelfAssessment` | Numeric |
+| `Q9_SKILL_COLL` | `CollaborationSelfAssessment` | Numeric |
+| `Q10_SKILL_LEARN` | `LearningAgility` | Numeric |
+| `Q11_WORK_ENV` | `PreferredEnvironment` | Categorical |
+| `Q12_WORK_PACE` | `PreferredPace` | Categorical |
+| `Q13_WORK_STABIL` | `StabilityPreference` | Categorical |
+| `Q14_WORK_COMP` | `CompensationPreference` | Categorical |
+| `Q15_WORK_INDUS` | `IndustryPreference` | Categorical |
 
-## 5. Numeric Representation
+## Numeric Assessment Values
 
-Skill levels, interests and questionnaire responses will use a five-point scale:
+The first ten questions use numeric values between 1 and 5.
 
-| Value | Meaning |
-|---:|---|
-| 1 | Very low |
-| 2 | Low |
-| 3 | Moderate |
-| 4 | High |
-| 5 | Very high |
+| Questions | Option A | Option B | Option C | Option D |
+|---|---:|---:|---:|---:|
+| Q1–Q5 | 5 | 4 | 3 | 1 |
+| Q6–Q9 | 5 | 4 | 2 | 1 |
+| Q10 | 5 | 4 | 3 | 2 |
 
-Using the same range makes the questionnaire easier to understand and keeps the numeric features consistent. The application should validate responses so that values below 1 or above 5 are rejected.
+The option identifiers follow the stable format `Q<number>_OPT_<letter>`, such as `Q1_OPT_A`.
 
-Categorical columns such as `AcademicBackground` and `PreferredWorkStyle` will be converted into numeric feature vectors using one-hot encoding during preprocessing.
+## Categorical Assessment Values
 
-## 6. Proposed ML.NET Pipeline
+| Question | A | B | C | D |
+|---|---|---|---|---|
+| Q11 | `RemoteHybrid` | `OfficeBased` | `Flexible` | `NoPreference` |
+| Q12 | `Fast` | `Moderate` | `Flexible` | `Slow` |
+| Q13 | `Growth` | `Stability` | `Balanced` | `Situational` |
+| Q14 | `SalaryBenefits` | `SalaryEquity` | `FreelanceContract` | `NoPreference` |
+| Q15 | `Technology` | `Finance` | `Healthcare` | `Other` |
 
-The proposed ML.NET pipeline will perform the following stages:
+## Synthetic Training Dataset
 
-1. Load the CSV data into an `IDataView`.
-2. Convert `CareerLabel` into a key type using `MapValueToKey`.
-3. One-hot encode `AcademicBackground` and `PreferredWorkStyle`.
-4. Combine the encoded categorical values and numeric questionnaire values into a single `Features` vector.
-5. Normalize the feature vector using `NormalizeMinMax`.
-6. Train a multiclass model using `SdcaMaximumEntropy`.
-7. Convert the predicted key back to its career name using `MapKeyToValue`.
-8. Read the probability score for each career and return the three highest-scoring careers.
+The training data is stored in:
 
-`SdcaMaximumEntropy` is suitable as the initial trainer because it supports multiclass classification, produces class probabilities and is practical for structured numeric and categorical features. Other trainers may be compared later when a larger and more reliable dataset is available.
-
-No final trainer will be implemented as part of this issue.
-
-## 7. Training and Validation
-
-The planned full dataset will be divided as follows:
-
-- 80% for training
-- 20% for validation
-- Random seed: 42, to make experiments reproducible
-
-The dataset should remain balanced so that every career is adequately represented in both portions. A larger dataset may also use cross-validation during model comparison.
-
-The current 24-row synthetic CSV is too small to measure real predictive quality. Its purpose is only to confirm the schema, labels and planned preprocessing steps.
-
-## 8. Evaluation Metrics
-
-The trained multiclass model will be evaluated using:
-
-### Micro-accuracy
-
-Micro-accuracy measures the overall proportion of predictions that are correct. A value closer to 1 indicates better overall performance.
-
-### Macro-accuracy
-
-Macro-accuracy calculates accuracy separately for each career and then averages the results. It helps identify whether the model performs reasonably across all eight careers instead of favouring only common labels.
-
-### Log-loss
-
-Log-loss evaluates the quality of the model's probability scores. Incorrect predictions made with very high confidence receive a larger penalty. A value closer to 0 is better.
-
-The three metrics should be considered together. Accuracy alone is not sufficient because the application also displays confidence scores.
-
-## 9. Dataset Balance
-
-The initial sample CSV will contain 24 rows:
-
-- Three Software Developer profiles
-- Three Data Analyst profiles
-- Three Cybersecurity Analyst profiles
-- Three Cloud Engineer profiles
-- Three Network Administrator profiles
-- Three Database Administrator profiles
-- Three UI/UX Designer profiles
-- Three AI/ML Engineer profiles
-
-This creates equal representation for all eight labels. However, balance in synthetic data does not prove that the profiles reflect real students.
-
-## 10. Limitations and Responsible Use
-
-The initial dataset is manually created synthetic sample data. It has not been collected from students, career counsellors, employers or validated research. A model trained only on this sample would learn the assumptions of its creators and could produce misleading recommendations.
-
-Before the system is considered reliable:
-
-- More representative training data must be collected.
-- Career experts should review the feature definitions and labels.
-- Data should represent students from different programmes and backgrounds.
-- Potential bias should be tested across relevant student groups.
-- Users should be informed that recommendations are advisory.
-- Students should be allowed to explore careers outside the top three.
-- Personal profile information must be handled responsibly.
-
-The application must not claim that an ML.NET prediction guarantees career success. Final decisions should remain with the student, supported where possible by academic advisers or career counsellors.
-
-## 11. Future Implementation
-
-A later issue will implement the ML.NET pipeline, train candidate models and connect the selected model to the recommendation service. That work should use the schema proposed here but may refine it if testing identifies weaknesses.
-
-The future implementation should also record the model version, training date, evaluation results and dataset version so that recommendations can be reproduced and reviewed.
-
-## References
-
-- [Microsoft ML.NET multiclass classification tutorial](https://learn.microsoft.com/en-us/dotnet/machine-learning/tutorials/github-issue-classification)
-- [Microsoft ML.NET model evaluation metrics](https://learn.microsoft.com/en-us/dotnet/machine-learning/resources/metrics)
-- [Microsoft ML.NET SdcaMaximumEntropy trainer](https://learn.microsoft.com/en-us/dotnet/api/microsoft.ml.trainers.sdcamaximumentropymulticlasstrainer)
+```text
+data/training/sample-career-training-data.csv
