@@ -1,0 +1,22 @@
+{
+  "TrainingDateUtc": "2026-08-18T22:26:44.434065Z",
+  "DatasetVersion": "1.0.0-synthetic-80",
+  "Trainer": "SdcaMaximumEntropy multiclass classification",
+  "RandomSeed": 42,
+  "TotalRecordCount": 80,
+  "TrainingRecordCount": 68,
+  "TestRecordCount": 12,
+  "MicroAccuracy": 1,
+  "MacroAccuracy": 1,
+  "LogLoss": 0.016382543538328017,
+  "ScoreLabels": [
+    "AI/ML Engineer",
+    "Cloud Engineer",
+    "Cybersecurity Analyst",
+    "Data Analyst",
+    "Database Administrator",
+    "Network Administrator",
+    "Software Developer",
+    "UI/UX Designer"
+  ]
+}
