@@ -4,13 +4,15 @@
 
 CareerIQ will use ML.NET multiclass classification to rank the eight supported technology careers from a student's saved profile and completed career assessment.
 
-This document defines the stable feature contract used by the recommendation workflow. It does not train a model or generate recommendations.
+This document defines the stable feature contract and reproducible ML.NET training workflow. The trained model is not yet used to display or persist recommendations.
 
 ## Current Status
 
-The recommendation feature schema and synthetic training dataset are ready for later ML.NET integration.
+The recommendation feature schema, synthetic training dataset and ML.NET training pipeline are implemented.
 
-The application does not currently generate career recommendations or confidence scores. Recommendation generation will be implemented in a later Sprint 3 issue.
+The pipeline validates the dataset, encodes categorical features, concatenates and normalizes the feature vector, trains a multiclass classification model and records evaluation metadata.
+
+The application does not yet display recommendations or confidence scores. That integration belongs to a later Sprint 3 issue.
 
 ## Supported Career Labels
 
@@ -148,7 +150,85 @@ The option identifiers follow the stable format `Q<number>_OPT_<letter>`, such a
 
 ## Synthetic Training Dataset
 
-The training data is stored in:
+The approved training data is stored at:
 
 ```text
 data/training/sample-career-training-data.csv
+```
+
+It contains 80 synthetic records with exactly 10 records for each supported career.
+
+This dataset exists only to demonstrate the academic MVP. Its evaluation results must not be interpreted as professional or real-world validation.
+
+## Training Pipeline
+
+The pipeline uses:
+
+- ML.NET 5.0
+- `SdcaMaximumEntropy` multiclass classification
+- Random seed `42`
+- An 80/20 train-test split
+- One-hot encoding for categorical inputs
+- Concatenation of numeric and encoded inputs
+- Min-max feature normalization
+
+The trainer validates the required columns, numeric ranges, categorical values and recognized career labels before training.
+
+## Retraining the Model
+
+From the repository root, run:
+
+```bash
+dotnet run --project tools/CareerAdvisor.ModelTrainer/CareerAdvisor.ModelTrainer.csproj
+```
+
+The command produces:
+
+```text
+data/models/career-recommendation-model.zip
+data/models/career-recommendation-model.metadata.json
+```
+
+The metadata records:
+
+- Dataset version
+- Training date in UTC
+- Trainer name
+- Random seed
+- Training and test record counts
+- Micro-accuracy
+- Macro-accuracy
+- Log-loss
+- Score-vector position to career-label mapping
+
+## Evaluation
+
+The trainer evaluates the model against the test partition and prints the metrics to the terminal.
+
+Because the dataset is small, balanced and synthetic, unusually high accuracy is possible. These metrics demonstrate that the pipeline works; they do not establish production readiness or professional validity.
+
+## Score-Vector Mapping
+
+ML.NET returns one score for each career label. The metadata file preserves which label corresponds to each score-vector position.
+
+Consumers must use this stored mapping instead of assuming a manually defined label order.
+
+## Verification
+
+Run the model-specific tests:
+
+```bash
+dotnet test CareerAdvisor.sln \
+  --filter "FullyQualifiedName~CareerModelTrainerTests"
+```
+
+Run the complete verification suite:
+
+```bash
+git diff --check
+dotnet build CareerAdvisor.sln --configuration Release
+dotnet test CareerAdvisor.sln --configuration Release
+git status --short
+```
+
+The tests confirm that the saved model loads successfully and produces eight finite scores.
