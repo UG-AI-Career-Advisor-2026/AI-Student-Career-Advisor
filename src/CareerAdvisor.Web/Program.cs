@@ -25,6 +25,8 @@ builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<IStudentProfileRepository, StudentProfileRepository>();
 builder.Services.AddScoped<StudentProfileValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
+builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
+builder.Services.AddScoped<CareerCatalogSynchronizer>();
 
 var connectionString = builder.Configuration.GetConnectionString(
         "CareerAdvisorDatabase")
@@ -45,8 +47,12 @@ using (var scope = app.Services.CreateScope())
         .GetRequiredService<CareerAdvisorDbContext>();
 
     await dbContext.Database.MigrateAsync();
-}
 
+    var catalogSynchronizer = scope.ServiceProvider
+        .GetRequiredService<CareerCatalogSynchronizer>();
+
+    await catalogSynchronizer.SynchronizeAsync();
+}
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

@@ -126,6 +126,13 @@ public class CareerAdvisorDbContext(
 
         entity.HasKey(career => career.Id);
 
+        entity.Property(career => career.Code)
+            .IsRequired()
+            .HasMaxLength(20);
+
+        entity.HasIndex(career => career.Code)
+            .IsUnique();
+
         entity.Property(career => career.Title)
             .IsRequired()
             .HasMaxLength(150);
@@ -149,7 +156,8 @@ public class CareerAdvisorDbContext(
 
         entity.HasMany(session => session.Recommendations)
             .WithOne()
-            .HasForeignKey("RecommendationSessionId")
+            .HasForeignKey(recommendation =>
+                recommendation.RecommendationSessionId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 
@@ -159,6 +167,9 @@ public class CareerAdvisorDbContext(
         var entity = modelBuilder.Entity<CareerRecommendation>();
 
         entity.HasKey(recommendation => recommendation.Id);
+
+        entity.Property(recommendation => recommendation.MatchScore)
+            .IsRequired();
 
         entity.Property(recommendation => recommendation.Reasoning)
             .IsRequired()

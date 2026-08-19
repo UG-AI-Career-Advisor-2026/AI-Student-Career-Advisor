@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CareerAdvisor.Core.Careers;
 using CareerAdvisor.Core.Interfaces;
 using CareerAdvisor.Core.Models;
 
@@ -7,7 +8,8 @@ namespace CareerAdvisor.Infrastructure.Repositories;
 public sealed class JsonCareerRepository : ICareerRepository
 {
     private readonly IReadOnlyList<CareerProfile> _careers;
-    private readonly IReadOnlyDictionary<string, CareerProfile> _careersByCode;
+    private readonly IReadOnlyDictionary<string, CareerProfile>
+        _careersByCode;
 
     public JsonCareerRepository(string jsonFilePath)
     {
@@ -36,36 +38,27 @@ public sealed class JsonCareerRepository : ICareerRepository
             ?? throw new InvalidDataException(
                 "Career catalogue could not be read.");
 
-        _careers = records.Select(record => new CareerProfile
-        {
-            Code = record.Code,
-            Title = record.Name,
-            Description = record.Description,
-            RequiredSkills = record.RequiredSkills,
-            RecommendedCertifications = record.RecommendedCertifications,
-            SuggestedLearningTopics = record.SuggestedLearningTopics
-        }).ToList();
+        ValidateRecords(records);
 
-        if (_careers.Count == 0)
-        {
-            throw new InvalidDataException("Career catalogue is empty.");
-        }
+        _careers = records
+            .Select(record =>
+            {
+                var code = record.Code.Trim();
 
-        if (_careers.Any(career =>
-                string.IsNullOrWhiteSpace(career.Code)))
-        {
-            throw new InvalidDataException(
-                "Every career must have a unique code.");
-        }
-
-        if (_careers
-                .Select(career => career.Code)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count() != _careers.Count)
-        {
-            throw new InvalidDataException(
-                "Career codes must be unique.");
-        }
+                return new CareerProfile
+                {
+                    Id = CareerCatalogIdentity.GetId(code),
+                    Code = code,
+                    Title = record.Name.Trim(),
+                    Description = record.Description.Trim(),
+                    RequiredSkills = [.. record.RequiredSkills],
+                    RecommendedCertifications =
+                        [.. record.RecommendedCertifications],
+                    SuggestedLearningTopics =
+                        [.. record.SuggestedLearningTopics]
+                };
+            })
+            .ToList();
 
         _careersByCode = _careers.ToDictionary(
             career => career.Code,
@@ -91,6 +84,7 @@ public sealed class JsonCareerRepository : ICareerRepository
         }
 
         _careersByCode.TryGetValue(code.Trim(), out var career);
+
         return Task.FromResult(career);
     }
 
@@ -112,6 +106,55 @@ public sealed class JsonCareerRepository : ICareerRepository
             "The JSON career catalogue is read-only.");
     }
 
+    private static void ValidateRecords(
+        IReadOnlyCollection<CareerCatalogRecord> records)
+    {
+        if (records.Count == 0)
+        {
+            throw new InvalidDataException(
+                "Career catalogue is empty.");
+        }
+
+        var codes = records
+            .Select(record => record.Code?.Trim() ?? string.Empty)
+            .ToList();
+
+        if (codes.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidDataException(
+                "Every career must have a unique code.");
+        }
+
+        if (codes
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count() != codes.Count)
+        {
+            throw new InvalidDataException(
+                "Career codes must be unique.");
+        }
+
+        var unknownCode = codes.FirstOrDefault(
+            code => !CareerCatalogIdentity.TryGetId(code, out _));
+
+        if (unknownCode is not null)
+        {
+            throw new InvalidDataException(
+                $"Career code '{unknownCode}' has no stable identity.");
+        }
+
+        var missingCodes = CareerCatalogIdentity.IdsByCode.Keys
+            .Except(codes, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(code => code)
+            .ToList();
+
+        if (missingCodes.Count > 0)
+        {
+            throw new InvalidDataException(
+                $"Career catalogue is missing supported codes: " +
+                $"{string.Join(", ", missingCodes)}.");
+        }
+    }
+
     private sealed class CareerCatalogRecord
     {
         public string Code { get; set; } = string.Empty;
@@ -122,8 +165,10 @@ public sealed class JsonCareerRepository : ICareerRepository
 
         public List<string> RequiredSkills { get; set; } = new();
 
-        public List<string> RecommendedCertifications { get; set; } = new();
+        public List<string> RecommendedCertifications { get; set; } =
+            new();
 
-        public List<string> SuggestedLearningTopics { get; set; } = new();
+        public List<string> SuggestedLearningTopics { get; set; } =
+            new();
     }
 }
