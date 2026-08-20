@@ -1,15 +1,440 @@
 @page "/recommendations"
+@rendermode InteractiveServer
+
+@using CareerAdvisor.Core.Interfaces
+@using CareerAdvisor.Core.Models
+@using CareerAdvisor.Core.Recommendations
+@using StudentProfileModel = CareerAdvisor.Core.Models.StudentProfile
+@inject IStudentProfileRepository ProfileRepository
+@inject IAssessmentService AssessmentService
+@inject IRecommendationRepository RecommendationRepository
+@inject IRecommendationService RecommendationService
 
 <PageTitle>CareerIQ – Recommendations</PageTitle>
 
-<h1>Recommendations</h1>
-<p>Career paths matched to your profile and assessment will appear here.</p>
+<div class="recommendations-shell">
+    <header class="recommendations-header">
+        <span class="recommendations-kicker">
+            Your CareerIQ results
+        </span>
 
-<PlaceholderNotice>
-    This page is a placeholder. Recommendations are not generated yet — the
-    matching logic has not been built.
-</PlaceholderNotice>
+        <h1>Career Recommendations</h1>
 
-<div class="border rounded p-4 text-center text-secondary">
-    Complete your Student Profile and Career Assessment to see recommendations.
+        <p>
+            Explore three career paths selected from your saved profile
+            and completed career assessment.
+        </p>
+    </header>
+
+    <div aria-live="polite">
+        @if (!string.IsNullOrWhiteSpace(_generationErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @_generationErrorMessage
+            </div>
+        }
+
+        @if (_isLoading)
+        {
+            <section class="state-panel" role="status">
+                <div class="spinner-border text-primary"
+                     aria-hidden="true"></div>
+
+                <h2>Loading your recommendations</h2>
+
+                <p>
+                    We are checking your saved profile, assessment and
+                    previous results.
+                </p>
+            </section>
+        }
+        else if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <section class="state-panel state-panel-error"
+                     role="alert">
+                <span class="state-icon" aria-hidden="true">!</span>
+
+                <h2>Recommendations could not be loaded</h2>
+
+                <p>@_errorMessage</p>
+
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        @onclick="ReloadAsync">
+                    Try again
+                </button>
+            </section>
+        }
+        else if (_requiresProfile)
+        {
+            <section class="state-panel">
+                <span class="state-icon" aria-hidden="true">1</span>
+
+                <h2>Complete your student profile</h2>
+
+                <p>
+                    CareerIQ needs your programme, interests and current
+                    skills before it can generate recommendations.
+                </p>
+
+                <a class="btn btn-primary"
+                   href="/student-profile">
+                    Go to Student Profile
+                </a>
+            </section>
+        }
+        else if (_requiresAssessment)
+        {
+            <section class="state-panel">
+                <span class="state-icon" aria-hidden="true">2</span>
+
+                <h2>Complete your career assessment</h2>
+
+                <p>
+                    Answer all 15 assessment questions so the model can
+                    use your interests, skills and work preferences.
+                </p>
+
+                <a class="btn btn-primary"
+                   href="/career-assessment">
+                    Go to Career Assessment
+                </a>
+            </section>
+        }
+        else if (_session is null)
+        {
+            <section class="state-panel">
+                <span class="state-icon state-icon-ready"
+                      aria-hidden="true">✓</span>
+
+                <h2>You are ready to generate recommendations</h2>
+
+                <p>
+                    Your saved profile and completed assessment will be
+                    evaluated by the CareerIQ recommendation model.
+                </p>
+
+                <button type="button"
+                        class="btn btn-primary btn-lg"
+                        disabled="@_isGenerating"
+                        @onclick="GenerateRecommendationsAsync">
+                    @if (_isGenerating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"
+                              aria-hidden="true"></span>
+
+                        <span>Generating recommendations…</span>
+                    }
+                    else
+                    {
+                        <span>Generate my recommendations</span>
+                    }
+                </button>
+            </section>
+        }
+        else
+        {
+            <section class="results-heading"
+                     aria-labelledby="results-title">
+                <div>
+                    <span class="results-label">
+                        Latest model-backed results
+                    </span>
+
+                    <h2 id="results-title">
+                        Your top three career matches
+                    </h2>
+
+                    <p>
+                        Generated @FormatGeneratedAt(_session.GeneratedAt)
+                    </p>
+                </div>
+
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        disabled="@_isGenerating"
+                        @onclick="GenerateRecommendationsAsync">
+                    @if (_isGenerating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"
+                              aria-hidden="true"></span>
+
+                        <span>Generating…</span>
+                    }
+                    else
+                    {
+                        <span>Generate new results</span>
+                    }
+                </button>
+            </section>
+
+            <div class="recommendation-grid">
+                @foreach (var ranked in GetRankedRecommendations())
+                {
+                    var recommendation = ranked.Recommendation;
+                    var career = recommendation.Career!;
+
+                    <article class="recommendation-card"
+                             aria-labelledby="@($"career-{recommendation.Id}")">
+                        <div class="card-topline">
+                            <span class="rank-badge">
+                                #@ranked.Rank
+                            </span>
+
+                            <div class="score-block"
+                                 aria-label="@($"Model match score {FormatMatchScore(recommendation.MatchScore)}")">
+                                <span>Model match</span>
+
+                                <strong>
+                                    @FormatMatchScore(
+                                        recommendation.MatchScore)
+                                </strong>
+                            </div>
+                        </div>
+
+                        <h3 id="@($"career-{recommendation.Id}")">
+                            @career.Title
+                        </h3>
+
+                        <p class="career-description">
+                            @career.Description
+                        </p>
+
+                        <div class="match-meter">
+                            <label for="@($"score-{recommendation.Id}")">
+                                Match score
+                            </label>
+
+                            <progress id="@($"score-{recommendation.Id}")"
+                                      max="1"
+                                      value="@recommendation.MatchScore">
+                                @FormatMatchScore(
+                                    recommendation.MatchScore)
+                            </progress>
+                        </div>
+
+                        <section class="explanation">
+                            <h4>Why this career was recommended</h4>
+
+                            <p>
+                                @GetExplanation(
+                                    recommendation.Reasoning)
+                            </p>
+                        </section>
+                    </article>
+                }
+            </div>
+
+            <aside class="advisory-notice" role="note">
+                <span aria-hidden="true">ⓘ</span>
+
+                <div>
+                    <h2>Use these recommendations as guidance</h2>
+                    <p>@RecommendationDisclaimer.Text</p>
+                </div>
+            </aside>
+        }
+    </div>
 </div>
+
+@code {
+    private StudentProfileModel? _profile;
+    private RecommendationSession? _session;
+
+    private bool _isLoading = true;
+    private bool _isGenerating;
+    private bool _requiresProfile;
+    private bool _requiresAssessment;
+
+    private string _errorMessage = string.Empty;
+    private string _generationErrorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        ResetPageState();
+        _isLoading = true;
+
+        try
+        {
+            IEnumerable<StudentProfileModel> profiles =
+                await ProfileRepository.GetAllAsync();
+
+            StudentProfileModel? profile =
+                profiles.FirstOrDefault();
+
+            if (profile is null)
+            {
+                _requiresProfile = true;
+                return;
+            }
+
+            _profile = profile;
+
+            var completedAssessment =
+                await AssessmentService
+                    .GetLatestCompletedAssessmentAsync(
+                        profile.Id);
+
+            if (completedAssessment is null)
+            {
+                _requiresAssessment = true;
+                return;
+            }
+
+            IEnumerable<RecommendationSession> sessions =
+                await RecommendationRepository
+                    .GetByStudentProfileIdAsync(
+                        profile.Id);
+
+            RecommendationSession? latestSession =
+                sessions.FirstOrDefault();
+
+            if (latestSession is not null)
+            {
+                try
+                {
+                    ValidateSavedSession(latestSession);
+                    _session = latestSession;
+                }
+                catch (InvalidOperationException exception)
+                {
+                    _generationErrorMessage = exception.Message;
+                }
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch
+        {
+            _errorMessage =
+                "Your saved recommendation information could not be " +
+                "loaded. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task GenerateRecommendationsAsync()
+    {
+        StudentProfileModel? profile = _profile;
+
+        if (profile is null || _isGenerating)
+        {
+            return;
+        }
+
+        _generationErrorMessage = string.Empty;
+        _isGenerating = true;
+
+        try
+        {
+            var generatedSession =
+                await RecommendationService
+                    .GenerateRecommendationsAsync(
+                        profile.Id);
+
+            ValidateSavedSession(generatedSession);
+            _session = generatedSession;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _generationErrorMessage = exception.Message;
+        }
+        catch
+        {
+            _generationErrorMessage =
+                "CareerIQ could not generate recommendations. " +
+                "Your previous saved results have not been replaced.";
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private void ResetPageState()
+    {
+        _profile = null;
+        _session = null;
+        _requiresProfile = false;
+        _requiresAssessment = false;
+        _errorMessage = string.Empty;
+        _generationErrorMessage = string.Empty;
+    }
+
+    private static void ValidateSavedSession(
+        RecommendationSession session)
+    {
+        if (session.Recommendations.Count != 3 ||
+            session.Recommendations.Any(recommendation =>
+                recommendation.Career is null) ||
+            session.Recommendations
+                .Select(recommendation =>
+                    recommendation.CareerProfileId)
+                .Distinct()
+                .Count() != 3)
+        {
+            throw new InvalidOperationException(
+                "The saved recommendation results are incomplete. " +
+                "Please generate them again.");
+        }
+    }
+
+    private IReadOnlyList<RankedRecommendation>
+        GetRankedRecommendations()
+    {
+        if (_session is null)
+        {
+            return [];
+        }
+
+        return _session.Recommendations
+            .OrderByDescending(recommendation =>
+                recommendation.MatchScore)
+            .Select((recommendation, index) =>
+                new RankedRecommendation(
+                    index + 1,
+                    recommendation))
+            .ToList();
+    }
+
+    private static string GetExplanation(string reasoning)
+    {
+        return reasoning
+            .Replace(
+                RecommendationDisclaimer.Text,
+                string.Empty,
+                StringComparison.Ordinal)
+            .Trim();
+    }
+
+    private static string FormatMatchScore(double matchScore)
+    {
+        return $"{Math.Round(matchScore * 100):0}%";
+    }
+
+    private static string FormatGeneratedAt(DateTime generatedAt)
+    {
+        return generatedAt
+            .ToLocalTime()
+            .ToString("dd MMM yyyy 'at' h:mm tt");
+    }
+
+    private sealed record RankedRecommendation(
+        int Rank,
+        CareerRecommendation Recommendation);
+}
