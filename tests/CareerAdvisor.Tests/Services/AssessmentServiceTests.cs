@@ -181,7 +181,97 @@ public class AssessmentServiceTests
             requiredQuestions.Count,
             savedSession.Responses.Count);
     }
+        [Fact]
+    public async Task GetLatestCompletedAssessmentAsync_ReturnsLatestCompletedSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new AssessmentService(database.Context);
+        var questions = service.GetAllQuestions();
 
+        var olderSession = service.CreateAssessmentSession(
+            database.StudentProfileId);
+
+        foreach (var question in questions)
+        {
+            var responseResult = service.SubmitResponse(
+                olderSession,
+                question.Id,
+                question.Options[0].Id);
+
+            Assert.True(
+                responseResult.IsValid,
+                string.Join(" ", responseResult.Errors));
+        }
+
+        var olderCompletion =
+            service.CompleteAssessmentSession(olderSession);
+
+        Assert.True(
+            olderCompletion.IsValid,
+            string.Join(" ", olderCompletion.Errors));
+
+        olderSession.CompletedAt = DateTime.UtcNow.AddDays(-1);
+        await database.Context.SaveChangesAsync();
+
+        var latestSession = service.CreateAssessmentSession(
+            database.StudentProfileId);
+
+        foreach (var question in questions)
+        {
+            var responseResult = service.SubmitResponse(
+                latestSession,
+                question.Id,
+                question.Options[1].Id);
+
+            Assert.True(
+                responseResult.IsValid,
+                string.Join(" ", responseResult.Errors));
+        }
+
+        var latestCompletion =
+            service.CompleteAssessmentSession(latestSession);
+
+        Assert.True(
+            latestCompletion.IsValid,
+            string.Join(" ", latestCompletion.Errors));
+
+        var inProgressSession = service.CreateAssessmentSession(
+            database.StudentProfileId);
+
+        var result =
+            await service.GetLatestCompletedAssessmentAsync(
+                database.StudentProfileId);
+
+        Assert.NotNull(result);
+        Assert.Equal(latestSession.Id, result.Id);
+        Assert.Equal("Completed", result.Status);
+        Assert.Equal(questions.Count, result.Responses.Count);
+        Assert.NotEqual(inProgressSession.Id, result.Id);
+        Assert.NotEqual(olderSession.Id, result.Id);
+    }
+
+    [Fact]
+    public async Task GetLatestCompletedAssessmentAsync_ReturnsNullWhenUnavailable()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new AssessmentService(database.Context);
+
+        var emptyIdResult =
+            await service.GetLatestCompletedAssessmentAsync(
+                Guid.Empty);
+
+        var unknownProfileResult =
+            await service.GetLatestCompletedAssessmentAsync(
+                Guid.NewGuid());
+
+        var withoutCompletedAssessment =
+            await service.GetLatestCompletedAssessmentAsync(
+                database.StudentProfileId);
+
+        Assert.Null(emptyIdResult);
+        Assert.Null(unknownProfileResult);
+        Assert.Null(withoutCompletedAssessment);
+    }
     private sealed class TestDatabase : IAsyncDisposable
     {
         private TestDatabase(
