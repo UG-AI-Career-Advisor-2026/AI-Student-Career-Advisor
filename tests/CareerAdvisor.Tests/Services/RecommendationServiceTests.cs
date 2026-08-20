@@ -202,6 +202,95 @@ public sealed class RecommendationServiceTests
                 .ToListAsync());
     }
 
+    [Fact]
+    public async Task GenerateRecommendationsAsync_UsesRealSavedModel()
+    {
+        await using var database =
+            await TestDatabase.CreateAsync();
+
+        var repositoryRoot = FindRepositoryRoot();
+
+        var modelPath = Path.Combine(
+            repositoryRoot,
+            "data",
+            "models",
+            "career-recommendation-model.zip");
+
+        var metadataPath = Path.Combine(
+            repositoryRoot,
+            "data",
+            "models",
+            "career-recommendation-model.metadata.json");
+
+        using var predictor = new CareerModelPredictor(
+            modelPath,
+            metadataPath);
+
+        var service = new RecommendationService(
+            new StudentProfileRepository(database.Context),
+            new AssessmentService(database.Context),
+            database.CareerRepository,
+            new RecommendationRepository(database.Context),
+            new RecommendationInputBuilder(),
+            predictor);
+
+        var result =
+            await service.GenerateRecommendationsAsync(
+                database.StudentProfileId);
+
+        Assert.Equal(3, result.Recommendations.Count);
+
+        Assert.Equal(
+            3,
+            result.Recommendations
+                .Select(recommendation =>
+                    recommendation.CareerProfileId)
+                .Distinct()
+                .Count());
+
+        Assert.All(
+            result.Recommendations,
+            recommendation =>
+            {
+                Assert.NotNull(recommendation.Career);
+
+                Assert.True(
+                    double.IsFinite(
+                        recommendation.MatchScore));
+
+                Assert.InRange(
+                    recommendation.MatchScore,
+                    0,
+                    1);
+
+                Assert.Contains(
+                    RecommendationDisclaimer.Text,
+                    recommendation.Reasoning,
+                    StringComparison.Ordinal);
+            });
+
+        var scores = result.Recommendations
+            .Select(recommendation =>
+                recommendation.MatchScore)
+            .ToArray();
+
+        Assert.Equal(
+            scores.OrderByDescending(score => score),
+            scores);
+
+        Assert.Equal(
+            1,
+            await database.Context
+                .RecommendationSessions
+                .CountAsync());
+
+        Assert.Equal(
+            3,
+            await database.Context
+                .CareerRecommendations
+                .CountAsync());
+    }
+
     private static RecommendationService CreateService(
         TestDatabase database,
         IReadOnlyList<CareerModelScore> scores)
