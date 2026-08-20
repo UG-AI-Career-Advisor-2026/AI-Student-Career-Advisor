@@ -1,6 +1,7 @@
-using CareerAdvisor.Core.Validators;
 using CareerAdvisor.Core.Interfaces;
+using CareerAdvisor.Core.Validators;
 using CareerAdvisor.Infrastructure.Data;
+using CareerAdvisor.Infrastructure.MachineLearning;
 using CareerAdvisor.Infrastructure.Repositories;
 using CareerAdvisor.Infrastructure.Services;
 using CareerAdvisor.Web.Components;
@@ -9,23 +10,56 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var careerCatalogPath = Path.GetFullPath(
+var repositoryRootPath = Path.GetFullPath(
     Path.Combine(
         builder.Environment.ContentRootPath,
         "..",
-        "..",
-        "data",
-        "career-catalog.json"));
+        ".."));
+
+var careerCatalogPath = Path.Combine(
+    repositoryRootPath,
+    "data",
+    "career-catalog.json");
+
+var recommendationModelPath = Path.Combine(
+    repositoryRootPath,
+    "data",
+    "models",
+    "career-recommendation-model.zip");
+
+var recommendationMetadataPath = Path.Combine(
+    repositoryRootPath,
+    "data",
+    "models",
+    "career-recommendation-model.metadata.json");
 
 builder.Services.AddSingleton<ICareerRepository>(
     _ => new JsonCareerRepository(careerCatalogPath));
 
+builder.Services.AddSingleton<RecommendationInputBuilder>();
+
+builder.Services.AddSingleton<ICareerModelPredictor>(
+    _ => new CareerModelPredictor(
+        recommendationModelPath,
+        recommendationMetadataPath));
+
 builder.Services.AddScoped<ICareerService, CareerService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
-builder.Services.AddScoped<IStudentProfileRepository, StudentProfileRepository>();
+
+builder.Services.AddScoped<
+    IStudentProfileRepository,
+    StudentProfileRepository>();
+
+builder.Services.AddScoped<
+    IRecommendationRepository,
+    RecommendationRepository>();
+
+builder.Services.AddScoped<
+    IRecommendationService,
+    RecommendationService>();
+
 builder.Services.AddScoped<StudentProfileValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
-builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
 builder.Services.AddScoped<CareerCatalogSynchronizer>();
 
 var connectionString = builder.Configuration.GetConnectionString(
@@ -53,9 +87,13 @@ using (var scope = app.Services.CreateScope())
 
     await catalogSynchronizer.SynchronizeAsync();
 }
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler(
+        "/Error",
+        createScopeForErrors: true);
+
     app.UseHsts();
 }
 
@@ -67,6 +105,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

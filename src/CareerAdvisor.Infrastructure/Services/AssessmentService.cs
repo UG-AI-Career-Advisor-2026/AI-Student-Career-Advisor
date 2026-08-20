@@ -70,6 +70,25 @@ public sealed class AssessmentService : IAssessmentService
             .SingleOrDefault(session => session.Id == sessionId);
     }
 
+    public async Task<AssessmentSession?>
+        GetLatestCompletedAssessmentAsync(Guid studentProfileId)
+    {
+        if (studentProfileId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _db.AssessmentSessions
+            .AsNoTracking()
+            .Include(session => session.Responses)
+            .Where(session =>
+                session.StudentProfileId == studentProfileId &&
+                session.Status == "Completed")
+            .OrderByDescending(session => session.CompletedAt)
+            .ThenByDescending(session => session.StartedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public ValidationResult SubmitResponse(
         AssessmentSession session,
         Guid questionId,
@@ -102,8 +121,8 @@ public sealed class AssessmentService : IAssessmentService
                 response.QuestionId == questionId);
 
         // Exclude the response being edited so the core validator can
-        // still reject genuine duplicate responses while allowing an
-        // existing answer to be changed.
+        // reject genuine duplicates while allowing an existing answer
+        // to be changed.
         var validationSession = new AssessmentSession
         {
             Id = persistedSession.Id,
