@@ -1,4 +1,5 @@
 using CareerAdvisor.Infrastructure.Repositories;
+using System.Text.Json.Nodes;
 
 namespace CareerAdvisor.Tests.Infrastructure;
 
@@ -78,5 +79,137 @@ public class JsonCareerRepositoryTests
 
         Assert.Throws<FileNotFoundException>(
             () => new JsonCareerRepository(missingPath));
+    }
+
+    [Fact]
+    public void Constructor_CareerWithFewerThanSixRequiredSkills_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            var requiredSkills = root[0]!["requiredSkills"]!.AsArray();
+            requiredSkills.RemoveAt(requiredSkills.Count - 1);
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Constructor_NullRequiredSkills_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            root[0]!["requiredSkills"] = null;
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Constructor_EmptyRequiredSkills_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            root[0]!["requiredSkills"] = new JsonArray();
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Constructor_WhitespaceRequiredSkill_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            root[0]!["requiredSkills"]![0] = "   ";
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Constructor_UntrimmedRequiredSkill_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            root[0]!["requiredSkills"]![0] = " C# or Java Programming";
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Constructor_DuplicateNormalizedRequiredSkill_ThrowsInvalidDataException()
+    {
+        var path = CreateModifiedCatalog(root =>
+        {
+            root[0]!["requiredSkills"]![1] = "c# OR java programming";
+        });
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(
+                () => new JsonCareerRepository(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static string CreateModifiedCatalog(
+        Action<JsonArray> modify)
+    {
+        var root = JsonNode
+            .Parse(File.ReadAllText(GetCatalogPath()))!
+            .AsArray();
+
+        modify(root);
+
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"career-catalog-{Guid.NewGuid()}.json");
+
+        File.WriteAllText(path, root.ToJsonString());
+        return path;
     }
 }

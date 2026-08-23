@@ -2,6 +2,7 @@ using System.Text.Json;
 using CareerAdvisor.Core.Careers;
 using CareerAdvisor.Core.Interfaces;
 using CareerAdvisor.Core.Models;
+using CareerAdvisor.Core.SkillGaps;
 
 namespace CareerAdvisor.Infrastructure.Repositories;
 
@@ -152,6 +153,48 @@ public sealed class JsonCareerRepository : ICareerRepository
             throw new InvalidDataException(
                 $"Career catalogue is missing supported codes: " +
                 $"{string.Join(", ", missingCodes)}.");
+        }
+
+        foreach (var record in records)
+        {
+            ValidateRequiredSkills(record);
+        }
+    }
+
+    private static void ValidateRequiredSkills(
+        CareerCatalogRecord record)
+    {
+        if (record.RequiredSkills is null ||
+            record.RequiredSkills.Count < 6)
+        {
+            throw new InvalidDataException(
+                $"Career '{record.Code}' must define at least six " +
+                "required skills.");
+        }
+
+        if (record.RequiredSkills.Any(skill =>
+                string.IsNullOrWhiteSpace(skill) ||
+                !string.Equals(
+                    skill,
+                    skill.Trim(),
+                    StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException(
+                $"Career '{record.Code}' contains a blank or untrimmed " +
+                "required skill.");
+        }
+
+        var normalizedSkills = record.RequiredSkills
+            .Select(SkillNameNormalizer.Normalize)
+            .ToList();
+
+        if (normalizedSkills
+                .Distinct(StringComparer.Ordinal)
+                .Count() != normalizedSkills.Count)
+        {
+            throw new InvalidDataException(
+                $"Career '{record.Code}' contains duplicate normalized " +
+                "required skills.");
         }
     }
 

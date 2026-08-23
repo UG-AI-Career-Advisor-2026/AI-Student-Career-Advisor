@@ -12,6 +12,10 @@ The data is stored in `data/career-catalog.json` as a JSON array. Each object co
 - `recommendedCertifications`: Industry-recognized professional certifications.
 - `suggestedLearningTopics`: Key areas for continued professional development.
 
+Required skills are the source of truth for deterministic skill-gap comparisons.
+See [Skill-Gap Matching Rules](SKILL_GAP_MATCHING.md) for normalization,
+approved aliases, validation, the academic MVP baseline, and limitations.
+
 ## Included Careers
 1. Software Developer
 2. Data Analyst
