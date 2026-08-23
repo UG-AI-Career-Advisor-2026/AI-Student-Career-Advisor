@@ -1,0 +1,379 @@
+.history-shell {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.history-header {
+    margin-bottom: 1.5rem;
+    padding: 2rem;
+    color: #fff;
+    background: linear-gradient(135deg, #173b70 0%, #275ba5 55%, #4d77ba 100%);
+    border-radius: 1.25rem;
+    box-shadow: 0 1rem 2.5rem rgba(23, 59, 112, 0.18);
+}
+
+.history-header h1 {
+    margin: 0.35rem 0 0.65rem;
+    font-weight: 700;
+}
+
+.history-header p {
+    max-width: 720px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.history-kicker,
+.section-label,
+.session-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.state-panel {
+    display: flex;
+    min-height: 300px;
+    padding: 2rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.8rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #e3e9f2;
+    border-radius: 1rem;
+    box-shadow: 0 0.4rem 1.5rem rgba(25, 45, 75, 0.06);
+}
+
+.state-panel h2 {
+    margin: 0.25rem 0 0;
+    color: #183153;
+    font-size: 1.35rem;
+}
+
+.state-panel p {
+    max-width: 620px;
+    margin: 0 0 0.5rem;
+    color: #64748b;
+}
+
+.state-panel-error {
+    border-color: #fecaca;
+    background: #fffafa;
+}
+
+.state-icon {
+    display: inline-grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    background: #b42318;
+    border-radius: 50%;
+}
+
+.state-icon-empty {
+    background: #275ba5;
+}
+
+.state-actions,
+.heading-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.section-heading,
+.session-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.section-heading {
+    margin-bottom: 1rem;
+    padding: 1.25rem 1.4rem;
+    background: #fff;
+    border: 1px solid #e3e9f2;
+    border-radius: 1rem;
+}
+
+.section-heading h2,
+.session-summary h3 {
+    margin: 0.25rem 0 0;
+    color: #183153;
+}
+
+.section-heading h2 {
+    font-size: 1.45rem;
+}
+
+.section-label,
+.session-label {
+    color: #275ba5;
+}
+
+.session-list,
+.career-summary-list,
+.details-grid {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.session-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.session-card,
+.recommendation-card {
+    background: #fff;
+    border: 1px solid #dce5f0;
+    border-radius: 1rem;
+    box-shadow: 0 0.5rem 1.6rem rgba(25, 45, 75, 0.07);
+}
+
+.session-card {
+    padding: 1.35rem;
+}
+
+.session-summary {
+    margin-bottom: 1rem;
+}
+
+.session-summary h3 {
+    font-size: 1.2rem;
+}
+
+.session-link {
+    display: inline-flex;
+    min-height: 2.75rem;
+    padding: 0.6rem 1rem;
+    align-items: center;
+    color: #174b91;
+    font-weight: 700;
+    text-decoration: none;
+    border: 2px solid #9ebbe5;
+    border-radius: 0.7rem;
+}
+
+.session-link:hover {
+    color: #10376b;
+    background: #f1f6fd;
+}
+
+.session-link:focus-visible,
+.history-shell .btn:focus-visible {
+    outline: 3px solid #f5b700;
+    outline-offset: 3px;
+}
+
+.career-summary-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.career-summary-list li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0.8rem;
+    align-items: center;
+    gap: 0.65rem;
+    background: #f7f9fc;
+    border-radius: 0.75rem;
+}
+
+.rank-badge {
+    display: inline-grid;
+    min-width: 2.35rem;
+    height: 2.35rem;
+    padding: 0 0.55rem;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    background: #275ba5;
+    border-radius: 999px;
+}
+
+.career-title {
+    min-width: 0;
+    color: #334155;
+    font-weight: 700;
+}
+
+.score {
+    color: #173b70;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.recommendation-card {
+    display: flex;
+    height: 100%;
+    min-width: 0;
+    padding: 1.35rem;
+    flex-direction: column;
+}
+
+.card-topline {
+    display: flex;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.score-block {
+    text-align: right;
+}
+
+.score-block span {
+    display: block;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.score-block strong {
+    color: #173b70;
+    font-size: 1.35rem;
+}
+
+.recommendation-card h3 {
+    margin: 0 0 0.65rem;
+    color: #183153;
+    font-size: 1.3rem;
+}
+
+.career-description {
+    color: #526276;
+    line-height: 1.6;
+}
+
+.career-reference {
+    overflow-wrap: anywhere;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.explanation {
+    margin-top: auto;
+    padding: 1rem;
+    background: #f7f9fc;
+    border: 1px solid #e4eaf2;
+    border-radius: 0.8rem;
+}
+
+.explanation h4 {
+    margin: 0 0 0.45rem;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.explanation p {
+    margin: 0;
+    color: #5b6879;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.advisory-notice {
+    display: flex;
+    margin-top: 1rem;
+    padding: 1.1rem 1.25rem;
+    align-items: flex-start;
+    gap: 0.8rem;
+    color: #5a4711;
+    background: #fff8df;
+    border: 1px solid #ecd889;
+    border-radius: 0.9rem;
+}
+
+.advisory-notice h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+}
+
+.advisory-notice p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 991.98px) {
+    .career-summary-list,
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .history-header {
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+
+    .state-panel {
+        min-height: 260px;
+        padding: 1.35rem;
+    }
+
+    .section-heading,
+    .session-summary {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .heading-actions,
+    .state-actions {
+        flex-direction: column;
+    }
+
+    .section-heading .btn,
+    .heading-actions .btn,
+    .state-actions .btn,
+    .session-link {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .session-card,
+    .recommendation-card {
+        padding: 1.1rem;
+    }
+}
+
+@media (max-width: 399.98px) {
+    .career-summary-list li,
+    .card-topline {
+        align-items: stretch;
+    }
+
+    .career-summary-list li {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .career-summary-list .score {
+        grid-column: 2;
+    }
+
+    .card-topline {
+        flex-direction: column;
+    }
+
+    .score-block {
+        text-align: left;
+    }
+}

@@ -58,6 +58,10 @@ builder.Services.AddScoped<
     IRecommendationService,
     RecommendationService>();
 
+builder.Services.AddScoped<
+    IRecommendationHistoryService,
+    RecommendationHistoryService>();
+
 builder.Services.AddScoped<StudentProfileValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 builder.Services.AddScoped<CareerCatalogSynchronizer>();

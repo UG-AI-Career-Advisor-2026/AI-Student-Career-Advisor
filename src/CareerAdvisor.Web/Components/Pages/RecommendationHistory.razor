@@ -1,15 +1,391 @@
 @page "/recommendation-history"
+@page "/recommendation-history/{SessionId:guid}"
+@rendermode InteractiveServer
 
-<PageTitle>CareerIQ – Recommendation History</PageTitle>
+@using CareerAdvisor.Core.Interfaces
+@using CareerAdvisor.Core.Models
+@using CareerAdvisor.Core.Recommendations
+@using StudentProfileModel = CareerAdvisor.Core.Models.StudentProfile
 
-<h1>Recommendation History</h1>
-<p>Past assessments and the recommendations they produced will be listed here.</p>
+@inject IStudentProfileRepository ProfileRepository
+@inject IRecommendationHistoryService HistoryService
 
-<PlaceholderNotice>
-    This page is a placeholder. Saved recommendation history has not been
-    built yet.
-</PlaceholderNotice>
+<PageTitle>@GetPageTitle()</PageTitle>
 
-<div class="border rounded p-4 text-center text-secondary">
-    No past recommendations yet.
+<div class="history-shell">
+    <header class="history-header">
+        <span class="history-kicker">Saved CareerIQ results</span>
+        <h1>@GetHeading()</h1>
+        <p>
+            Review recommendation sessions exactly as they were saved for
+            your selected student profile.
+        </p>
+    </header>
+
+    <div aria-live="polite">
+        @if (_isLoading)
+        {
+            <section class="state-panel" role="status">
+                <div class="spinner-border text-primary"
+                     aria-hidden="true"></div>
+                <h2>Loading recommendation history</h2>
+                <p>CareerIQ is reopening your saved recommendation results.</p>
+            </section>
+        }
+        else if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <section class="state-panel state-panel-error" role="alert">
+                <span class="state-icon" aria-hidden="true">!</span>
+                <h2>Recommendation history could not be loaded</h2>
+                <p>@_errorMessage</p>
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        @onclick="ReloadAsync">
+                    Try again
+                </button>
+            </section>
+        }
+        else if (_requiresProfile)
+        {
+            <section class="state-panel">
+                <span class="state-icon" aria-hidden="true">1</span>
+                <h2>Save a student profile first</h2>
+                <p>
+                    Recommendation history is linked to a saved student
+                    profile.
+                </p>
+                <a class="btn btn-primary" href="/student-profile">
+                    Go to Student Profile
+                </a>
+            </section>
+        }
+        else if (_sessionNotFound)
+        {
+            <section class="state-panel state-panel-error" role="alert">
+                <span class="state-icon" aria-hidden="true">!</span>
+                <h2>Saved session not found</h2>
+                <p>
+                    This recommendation session could not be found for the
+                    selected saved profile.
+                </p>
+                <div class="state-actions">
+                    <a class="btn btn-primary"
+                       href="/recommendation-history">
+                        Back to recommendation history
+                    </a>
+                    <a class="btn btn-outline-primary"
+                       href="/recommendations">
+                        Go to current recommendations
+                    </a>
+                </div>
+            </section>
+        }
+        else if (SessionId is not null && _session is not null)
+        {
+            @RenderSessionDetails(_session)
+        }
+        else if (_sessions.Count == 0)
+        {
+            <section class="state-panel">
+                <span class="state-icon state-icon-empty"
+                      aria-hidden="true">0</span>
+                <h2>No saved recommendation sessions yet</h2>
+                <p>
+                    Generate recommendations to create the first read-only
+                    history entry for this profile.
+                </p>
+                <a class="btn btn-primary" href="/recommendations">
+                    Go to current recommendations
+                </a>
+            </section>
+        }
+        else
+        {
+            <section aria-labelledby="history-list-title">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-label">Newest first</span>
+                        <h2 id="history-list-title">Saved sessions</h2>
+                    </div>
+                    <a class="btn btn-outline-primary"
+                       href="/recommendations">
+                        Go to current recommendations
+                    </a>
+                </div>
+
+                <ol class="session-list">
+                    @foreach (var session in _sessions)
+                    {
+                        <li @key="session.Id">
+                            <article class="session-card"
+                                     aria-labelledby="@($"session-{session.Id}")">
+                                <div class="session-summary">
+                                    <div>
+                                        <span class="session-label">
+                                            Recommendation session
+                                        </span>
+                                        <h3 id="@($"session-{session.Id}")">
+                                            <time datetime="@FormatDateTimeAttribute(session.GeneratedAt)">
+                                                @FormatGeneratedAt(session.GeneratedAt)
+                                            </time>
+                                        </h3>
+                                    </div>
+                                    <a class="session-link"
+                                       href="@($"/recommendation-history/{session.Id}")"
+                                       aria-label="@($"View recommendations generated {FormatGeneratedAt(session.GeneratedAt)}")">
+                                        View saved session
+                                    </a>
+                                </div>
+
+                                <ol class="career-summary-list">
+                                    @for (var index = 0;
+                                          index < session.Recommendations.Count;
+                                          index++)
+                                    {
+                                        var recommendation =
+                                            session.Recommendations[index];
+
+                                        <li>
+                                            <span class="rank-badge">
+                                                #@(index + 1)
+                                            </span>
+                                            <span class="career-title">
+                                                @recommendation.Career!.Title
+                                            </span>
+                                            <strong class="score">
+                                                @FormatMatchScore(
+                                                    recommendation.MatchScore)
+                                            </strong>
+                                        </li>
+                                    }
+                                </ol>
+                            </article>
+                        </li>
+                    }
+                </ol>
+            </section>
+        }
+    </div>
 </div>
+
+@code {
+    [Parameter]
+    public Guid? SessionId { get; set; }
+
+    private IReadOnlyList<RecommendationSession> _sessions = [];
+    private RecommendationSession? _session;
+    private StudentProfileModel? _profile;
+
+    private bool _isLoading = true;
+    private bool _requiresProfile;
+    private bool _sessionNotFound;
+    private string _errorMessage = string.Empty;
+    private long _loadVersion;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        var requestedSessionId = SessionId;
+        var loadVersion = ++_loadVersion;
+
+        ResetPageState();
+        _isLoading = true;
+
+        try
+        {
+            var profiles = await ProfileRepository.GetAllAsync();
+
+            if (loadVersion != _loadVersion)
+            {
+                return;
+            }
+
+            var profile = profiles.FirstOrDefault();
+
+            if (profile is null)
+            {
+                _requiresProfile = true;
+                return;
+            }
+
+            _profile = profile;
+
+            if (requestedSessionId is Guid sessionId)
+            {
+                var session = await HistoryService.GetSessionAsync(
+                    profile.Id,
+                    sessionId);
+
+                if (loadVersion != _loadVersion)
+                {
+                    return;
+                }
+
+                _session = session;
+                _sessionNotFound = session is null;
+                return;
+            }
+
+            var sessions = await HistoryService.GetHistoryAsync(profile.Id);
+
+            if (loadVersion != _loadVersion)
+            {
+                return;
+            }
+
+            _sessions = sessions.ToList();
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (loadVersion == _loadVersion)
+            {
+                _errorMessage = exception.Message;
+            }
+        }
+        catch
+        {
+            if (loadVersion == _loadVersion)
+            {
+                _errorMessage =
+                    "Your saved recommendation history could not be loaded. " +
+                    "Please try again.";
+            }
+        }
+        finally
+        {
+            if (loadVersion == _loadVersion)
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private void ResetPageState()
+    {
+        _sessions = [];
+        _session = null;
+        _profile = null;
+        _requiresProfile = false;
+        _sessionNotFound = false;
+        _errorMessage = string.Empty;
+    }
+
+    private RenderFragment RenderSessionDetails(
+        RecommendationSession session) =>
+        @<section aria-labelledby="session-details-title">
+            <div class="section-heading details-heading">
+                <div>
+                    <span class="section-label">Saved session details</span>
+                    <h2 id="session-details-title">
+                        <time datetime="@FormatDateTimeAttribute(session.GeneratedAt)">
+                            @FormatGeneratedAt(session.GeneratedAt)
+                        </time>
+                    </h2>
+                </div>
+                <div class="heading-actions">
+                    <a class="btn btn-outline-primary"
+                       href="/recommendation-history">
+                        Back to history
+                    </a>
+                    <a class="btn btn-primary" href="/recommendations">
+                        Current recommendations
+                    </a>
+                </div>
+            </div>
+
+            <ol class="details-grid">
+                @for (var index = 0;
+                      index < session.Recommendations.Count;
+                      index++)
+                {
+                    var recommendation = session.Recommendations[index];
+                    var career = recommendation.Career!;
+
+                    <li>
+                        <article class="recommendation-card"
+                                 aria-labelledby="@($"career-{recommendation.Id}")">
+                            <div class="card-topline">
+                                <span class="rank-badge">#@(index + 1)</span>
+                                <div class="score-block"
+                                     aria-label="@($"Saved match score {FormatMatchScore(recommendation.MatchScore)}")">
+                                    <span>Saved match</span>
+                                    <strong>
+                                        @FormatMatchScore(
+                                            recommendation.MatchScore)
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <h3 id="@($"career-{recommendation.Id}")">
+                                @career.Title
+                            </h3>
+                            <p class="career-description">
+                                @career.Description
+                            </p>
+                            <p class="career-reference">
+                                Saved career ID: @recommendation.CareerProfileId
+                            </p>
+
+                            <section class="explanation">
+                                <h4>Saved explanation</h4>
+                                <p>@GetExplanationContent(recommendation.Reasoning)</p>
+                            </section>
+                        </article>
+                    </li>
+                }
+            </ol>
+
+            <aside class="advisory-notice" role="note">
+                <span aria-hidden="true">ⓘ</span>
+                <div>
+                    <h2>Use these recommendations as guidance</h2>
+                    <p>@RecommendationDisclaimer.Text</p>
+                </div>
+            </aside>
+        </section>;
+
+    private string GetPageTitle()
+    {
+        return SessionId is null
+            ? "CareerIQ – Recommendation History"
+            : "CareerIQ – Saved Recommendation Session";
+    }
+
+    private string GetHeading()
+    {
+        return SessionId is null
+            ? "Recommendation History"
+            : "Saved Recommendation Session";
+    }
+
+    private static string GetExplanationContent(string reasoning)
+    {
+        return RecommendationDisclaimer.RemoveExactOccurrences(reasoning);
+    }
+
+    private static string FormatMatchScore(double matchScore)
+    {
+        return $"{Math.Round(matchScore * 100):0}%";
+    }
+
+    private static string FormatGeneratedAt(DateTime generatedAt)
+    {
+        return generatedAt
+            .ToLocalTime()
+            .ToString("dd MMM yyyy 'at' h:mm tt");
+    }
+
+    private static string FormatDateTimeAttribute(DateTime generatedAt)
+    {
+        return generatedAt.ToUniversalTime().ToString("O");
+    }
+}
