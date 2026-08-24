@@ -1,14 +1,1014 @@
 @page "/learning-roadmap"
+@page "/learning-roadmap/{RoadmapId:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
+
+@using CareerAdvisor.Core.Enums
+@using CareerAdvisor.Core.Interfaces
+@using CareerAdvisor.Core.Models
+@using RoadmapModel = CareerAdvisor.Core.Models.LearningRoadmap
+@using StudentProfileModel = CareerAdvisor.Core.Models.StudentProfile
+
+@inject IStudentProfileRepository ProfileRepository
+@inject IRecommendationHistoryService HistoryService
+@inject ISkillGapService SkillGapService
+@inject IRoadmapService RoadmapService
+@inject NavigationManager Navigation
 
 <PageTitle>CareerIQ – Learning Roadmap</PageTitle>
 
-<h1>Learning Roadmap</h1>
-<p>A step-by-step plan for the skills and courses to reach your chosen career path will appear here.</p>
+<div class="roadmap-shell">
+    <header class="roadmap-header">
+        <span class="roadmap-kicker">Your academic development plan</span>
+        <h1>Learning Roadmap</h1>
+        <p>
+            Compare your saved skills with a recommended career, then build
+            or reopen a persisted learning roadmap.
+        </p>
+    </header>
 
-<PlaceholderNotice>
-    This page is a placeholder. Roadmap generation has not been built yet.
-</PlaceholderNotice>
+    <div class="visually-hidden" role="status" aria-atomic="true">
+        @_statusAnnouncement
+    </div>
 
-<div class="border rounded p-4 text-center text-secondary">
-    Select a recommendation to generate a learning roadmap.
+    <div class="page-status">
+        @if (_isPageLoading)
+        {
+            <section class="state-panel" role="status" aria-busy="true">
+                <div class="spinner-border text-primary" aria-hidden="true"></div>
+                <h2>Loading your learning roadmap</h2>
+                <p>
+                    CareerIQ is checking your saved profile and latest
+                    recommendation session.
+                </p>
+            </section>
+        }
+        else if (!string.IsNullOrWhiteSpace(_pageError))
+        {
+            <section class="state-panel state-panel-error" role="alert">
+                <span class="state-icon" aria-hidden="true">!</span>
+                <h2>Learning roadmap could not be loaded</h2>
+                <p>@_pageError</p>
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        @onclick="ReloadAsync">
+                    Try again
+                </button>
+            </section>
+        }
+        else if (_requiresProfile)
+        {
+            <section class="state-panel">
+                <span class="state-icon" aria-hidden="true">1</span>
+                <h2>Save a student profile first</h2>
+                <p>
+                    A learning roadmap must be linked to a saved student
+                    profile and its current skills.
+                </p>
+                <a class="btn btn-primary" href="/student-profile">
+                    Go to Student Profile
+                </a>
+            </section>
+        }
+        else if (_requiresRecommendations)
+        {
+            <section class="state-panel">
+                <span class="state-icon" aria-hidden="true">2</span>
+                <h2>Generate career recommendations first</h2>
+                <p>
+                    A roadmap can only be created for one of the three careers
+                    in your newest saved recommendation session.
+                </p>
+                <a class="btn btn-primary" href="/recommendations">
+                    Go to Recommendations
+                </a>
+            </section>
+        }
+        else if (_roadmapUnavailable)
+        {
+            <section class="state-panel state-panel-error" role="alert">
+                <span class="state-icon" aria-hidden="true">!</span>
+                <h2>Learning roadmap unavailable</h2>
+                <p>
+                    This roadmap cannot be opened from the newest saved
+                    recommendations for this profile.
+                </p>
+                <a class="btn btn-primary" href="/learning-roadmap">
+                    Choose a recommended career
+                </a>
+            </section>
+        }
+        else if (_latestSession is not null)
+        {
+            @if (RoadmapId is null)
+            {
+                <section class="career-selection"
+                         aria-labelledby="career-selection-title"
+                         aria-busy="@_isSelectionLoading">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-label">
+                                Newest saved recommendations
+                            </span>
+                            <h2 id="career-selection-title">Choose a career</h2>
+                        </div>
+                        <a class="btn btn-outline-primary"
+                           href="/recommendation-history">
+                            View recommendation history
+                        </a>
+                    </div>
+
+                    <fieldset>
+                        <legend class="visually-hidden">
+                            Select one of your three newest recommended careers
+                        </legend>
+                        <div class="career-grid">
+                            @for (var index = 0;
+                                  index < _latestSession.Recommendations.Count;
+                                  index++)
+                            {
+                                var recommendation =
+                                    _latestSession.Recommendations[index];
+                                var career = recommendation.Career!;
+                                var rank = index + 1;
+
+                                <label class="career-option @(IsSelected(career.Id) ? "career-option-selected" : null)"
+                                       for="@($"career-{career.Id}")">
+                                    <input id="@($"career-{career.Id}")"
+                                           type="radio"
+                                           name="recommended-career"
+                                           value="@career.Id"
+                                           checked="@IsSelected(career.Id)"
+                                           disabled="@(_isGeneratingRoadmap || _updatingStepId is not null)"
+                                           @onchange="() => SelectCareerAsync(career.Id)" />
+                                    <span class="career-option-content">
+                                        <span class="career-option-topline">
+                                            <span class="rank-badge">#@rank</span>
+                                            <strong class="saved-score">
+                                                @FormatMatchScore(
+                                                    recommendation.MatchScore)
+                                            </strong>
+                                        </span>
+                                        <span class="career-title">@career.Title</span>
+                                        <span class="selection-label">
+                                            Select @career.Title
+                                        </span>
+                                    </span>
+                                </label>
+                            }
+                        </div>
+                    </fieldset>
+                </section>
+            }
+            else if (_selectedRecommendation is not null)
+            {
+                <section class="selected-career-summary"
+                         aria-labelledby="selected-career-title">
+                    <div>
+                        <span class="section-label">Selected career</span>
+                        <h2 id="selected-career-title">
+                            @_selectedRecommendation.Career!.Title
+                        </h2>
+                        <p>
+                            Saved match score
+                            <strong>
+                                @FormatMatchScore(
+                                    _selectedRecommendation.MatchScore)
+                            </strong>
+                        </p>
+                    </div>
+                    <a class="btn btn-outline-primary"
+                       href="/learning-roadmap">
+                        Choose another career
+                    </a>
+                </section>
+            }
+
+            @if (_isSelectionLoading)
+            {
+                <section class="state-panel state-panel-compact"
+                         role="status"
+                         aria-busy="true">
+                    <div class="spinner-border text-primary" aria-hidden="true"></div>
+                    <h2>Comparing your saved skills</h2>
+                    <p>
+                        CareerIQ is loading the deterministic skill-gap result
+                        for the selected career.
+                    </p>
+                </section>
+            }
+            else if (!string.IsNullOrWhiteSpace(_selectionError))
+            {
+                <section class="inline-alert" role="alert">
+                    <h2>Skill gap could not be loaded</h2>
+                    <p>@_selectionError</p>
+                </section>
+            }
+            else if (_skillGap is not null)
+            {
+                @RenderSkillGap(_skillGap)
+
+                @if (_roadmap is null)
+                {
+                    <section class="generation-panel"
+                             aria-labelledby="generation-title"
+                             aria-busy="@_isGeneratingRoadmap">
+                        <div>
+                            <span class="section-label">Persisted academic plan</span>
+                            <h2 id="generation-title">Ready to build your roadmap</h2>
+                            <p>
+                                The same action safely reopens an existing
+                                roadmap without resetting saved progress.
+                            </p>
+                        </div>
+                        <button type="button"
+                                class="btn btn-primary btn-lg"
+                                disabled="@(_isGeneratingRoadmap || _updatingStepId is not null)"
+                                @onclick="GenerateOrReopenRoadmapAsync">
+                            @if (_isGeneratingRoadmap)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"
+                                      aria-hidden="true"></span>
+                                <span>Generating or reopening…</span>
+                            }
+                            else
+                            {
+                                <span>
+                                    Generate or reopen roadmap for
+                                    @_skillGap.CareerTitle
+                                </span>
+                            }
+                        </button>
+                    </section>
+
+                    @if (!string.IsNullOrWhiteSpace(_roadmapActionError))
+                    {
+                        <div class="inline-alert" role="alert">
+                            <h2>Roadmap could not be generated or reopened</h2>
+                            <p>@_roadmapActionError</p>
+                        </div>
+                    }
+                }
+            }
+
+            @if (_roadmap is not null)
+            {
+                @RenderRoadmap(_roadmap)
+            }
+
+            <aside class="advisory-notice" role="note">
+                <span aria-hidden="true">ⓘ</span>
+                <div>
+                    <h2>Use this roadmap as academic guidance</h2>
+                    <p>
+                        Certifications are exploration suggestions, not
+                        mandatory employment requirements. Completing this
+                        roadmap does not guarantee certification, employment
+                        or career success.
+                    </p>
+                </div>
+            </aside>
+        }
+    </div>
 </div>
+
+@code {
+    [Parameter]
+    public Guid? RoadmapId { get; set; }
+
+    private StudentProfileModel? _profile;
+    private RecommendationSession? _latestSession;
+    private CareerRecommendation? _selectedRecommendation;
+    private Guid? _selectedCareerId;
+    private SkillGapResult? _skillGap;
+    private RoadmapModel? _roadmap;
+
+    private bool _isPageLoading = true;
+    private bool _isSelectionLoading;
+    private bool _isGeneratingRoadmap;
+    private bool _requiresProfile;
+    private bool _requiresRecommendations;
+    private bool _roadmapUnavailable;
+    private Guid? _updatingStepId;
+
+    private string _pageError = string.Empty;
+    private string _selectionError = string.Empty;
+    private string _roadmapActionError = string.Empty;
+    private string _progressError = string.Empty;
+    private string _statusAnnouncement = string.Empty;
+
+    private long _pageLoadVersion;
+    private long _selectionVersion;
+    private long _roadmapActionVersion;
+    private long _progressVersion;
+    private bool _disposed;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        if (!parameters.TryGetValue<Guid?>(nameof(RoadmapId), out _))
+        {
+            RoadmapId = null;
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnParametersSetAsync() =>
+        await LoadPageAsync();
+
+    private async Task LoadPageAsync()
+    {
+        var requestedRoadmapId = RoadmapId;
+        var pageVersion = ++_pageLoadVersion;
+
+        InvalidateChildOperations();
+        ResetPageState();
+        _isPageLoading = true;
+
+        try
+        {
+            var profiles = await ProfileRepository.GetAllAsync();
+
+            if (!IsCurrentPageLoad(pageVersion)) return;
+
+            var profile = profiles.FirstOrDefault();
+
+            if (profile is null)
+            {
+                _requiresProfile = true;
+                return;
+            }
+
+            _profile = profile;
+            var sessions = await HistoryService.GetHistoryAsync(profile.Id);
+
+            if (!IsCurrentPageLoad(pageVersion)) return;
+
+            var latestSession = sessions.FirstOrDefault();
+
+            if (latestSession is null)
+            {
+                _requiresRecommendations = true;
+                return;
+            }
+
+            _latestSession = latestSession;
+
+            if (requestedRoadmapId is not Guid roadmapId)
+            {
+                _statusAnnouncement =
+                    "Your three newest career recommendations are ready " +
+                    "for selection.";
+                return;
+            }
+
+            RoadmapModel reopened;
+
+            try
+            {
+                reopened = await RoadmapService.GetRoadmapAsync(
+                    profile.Id,
+                    roadmapId);
+            }
+            catch (InvalidOperationException)
+            {
+                if (IsCurrentPageLoad(pageVersion))
+                {
+                    _roadmapUnavailable = true;
+                }
+
+                return;
+            }
+
+            if (!IsCurrentPageLoad(pageVersion)) return;
+
+            var recommendation = latestSession.Recommendations
+                .SingleOrDefault(candidate =>
+                    candidate.CareerProfileId == reopened.CareerProfileId);
+
+            if (recommendation is null ||
+                reopened.StudentProfileId != profile.Id ||
+                reopened.Id != roadmapId)
+            {
+                _roadmapUnavailable = true;
+                return;
+            }
+
+            _selectedCareerId = recommendation.CareerProfileId;
+            _selectedRecommendation = recommendation;
+
+            try
+            {
+                var skillGap = await SkillGapService.AnalyzeAsync(
+                    profile.Id,
+                    recommendation.CareerProfileId);
+
+                if (!IsCurrentPageLoad(pageVersion)) return;
+
+                if (skillGap.StudentProfileId != profile.Id ||
+                    skillGap.CareerProfileId != recommendation.CareerProfileId)
+                {
+                    _selectionError = SkillGapLoadError;
+                    return;
+                }
+
+                _skillGap = skillGap;
+                _roadmap = reopened;
+                _statusAnnouncement = GetRoadmapStatusAnnouncement(
+                    reopened,
+                    recommendation.Career!.Title,
+                    "Roadmap generated or reopened.");
+            }
+            catch
+            {
+                if (IsCurrentPageLoad(pageVersion))
+                {
+                    _selectionError = SkillGapLoadError;
+                }
+            }
+        }
+        catch
+        {
+            if (IsCurrentPageLoad(pageVersion))
+            {
+                _pageError = PageLoadError;
+            }
+        }
+        finally
+        {
+            if (IsCurrentPageLoad(pageVersion))
+            {
+                _isPageLoading = false;
+            }
+        }
+    }
+
+    private async Task SelectCareerAsync(Guid careerId)
+    {
+        var profile = _profile;
+        var recommendation = _latestSession?.Recommendations.SingleOrDefault(
+            candidate => candidate.CareerProfileId == careerId);
+
+        if (profile is null ||
+            recommendation is null ||
+            _isGeneratingRoadmap ||
+            _updatingStepId is not null)
+        {
+            return;
+        }
+
+        var pageVersion = _pageLoadVersion;
+        var selectionVersion = ++_selectionVersion;
+        _roadmapActionVersion++;
+        _progressVersion++;
+
+        _selectedCareerId = careerId;
+        _selectedRecommendation = recommendation;
+        _skillGap = null;
+        _roadmap = null;
+        _selectionError = string.Empty;
+        _roadmapActionError = string.Empty;
+        _progressError = string.Empty;
+        _statusAnnouncement = string.Empty;
+        _isSelectionLoading = true;
+
+        try
+        {
+            var skillGap = await SkillGapService.AnalyzeAsync(
+                profile.Id,
+                careerId);
+
+            if (!IsCurrentSelection(
+                    pageVersion,
+                    selectionVersion,
+                    careerId)) return;
+
+            if (skillGap.StudentProfileId != profile.Id ||
+                skillGap.CareerProfileId != careerId)
+            {
+                _selectionError = SkillGapLoadError;
+                return;
+            }
+
+            _skillGap = skillGap;
+            _statusAnnouncement =
+                $"Skill-gap analysis loaded for " +
+                $"{recommendation.Career!.Title}.";
+        }
+        catch
+        {
+            if (IsCurrentSelection(pageVersion, selectionVersion, careerId))
+            {
+                _selectionError = SkillGapLoadError;
+            }
+        }
+        finally
+        {
+            if (IsCurrentSelection(pageVersion, selectionVersion, careerId))
+            {
+                _isSelectionLoading = false;
+            }
+        }
+    }
+
+    private async Task GenerateOrReopenRoadmapAsync()
+    {
+        var profile = _profile;
+        var careerId = _selectedCareerId;
+
+        if (profile is null ||
+            careerId is null ||
+            _skillGap is null ||
+            _isGeneratingRoadmap ||
+            _updatingStepId is not null) return;
+
+        var pageVersion = _pageLoadVersion;
+        var selectionVersion = _selectionVersion;
+        var actionVersion = ++_roadmapActionVersion;
+        _roadmapActionError = string.Empty;
+        _statusAnnouncement = string.Empty;
+        _isGeneratingRoadmap = true;
+
+        try
+        {
+            var roadmap = await RoadmapService.GenerateRoadmapAsync(
+                profile.Id,
+                careerId.Value);
+
+            if (!IsCurrentRoadmapAction(
+                    pageVersion,
+                    selectionVersion,
+                    actionVersion,
+                    careerId.Value)) return;
+
+            if (roadmap.StudentProfileId != profile.Id ||
+                roadmap.CareerProfileId != careerId.Value ||
+                roadmap.Id == Guid.Empty)
+            {
+                _roadmapActionError = RoadmapActionError;
+                return;
+            }
+
+            _roadmap = roadmap;
+            Navigation.NavigateTo($"/learning-roadmap/{roadmap.Id}");
+        }
+        catch
+        {
+            if (IsCurrentRoadmapAction(
+                    pageVersion,
+                    selectionVersion,
+                    actionVersion,
+                    careerId.Value))
+            {
+                _roadmapActionError = RoadmapActionError;
+            }
+        }
+        finally
+        {
+            if (IsCurrentRoadmapAction(
+                    pageVersion,
+                    selectionVersion,
+                    actionVersion,
+                    careerId.Value))
+            {
+                _isGeneratingRoadmap = false;
+            }
+        }
+    }
+
+    private async Task UpdateProgressAsync(RoadmapStep step)
+    {
+        var profile = _profile;
+        var roadmap = _roadmap;
+
+        if (profile is null ||
+            roadmap is null ||
+            _updatingStepId is not null ||
+            !roadmap.Steps.Any(candidate => candidate.Id == step.Id)) return;
+
+        var desiredState = !step.IsCompleted;
+        var pageVersion = _pageLoadVersion;
+        var selectionVersion = _selectionVersion;
+        var progressVersion = ++_progressVersion;
+        var roadmapId = roadmap.Id;
+        var stepId = step.Id;
+
+        _progressError = string.Empty;
+        _statusAnnouncement = string.Empty;
+        _updatingStepId = stepId;
+
+        try
+        {
+            var persisted = await RoadmapService.UpdateRoadmapProgressAsync(
+                profile.Id,
+                roadmapId,
+                stepId,
+                desiredState);
+
+            if (!IsCurrentProgress(
+                    pageVersion,
+                    selectionVersion,
+                    progressVersion,
+                    roadmapId,
+                    stepId)) return;
+
+            var persistedStep = persisted.Steps.SingleOrDefault(candidate =>
+                candidate.Id == stepId);
+
+            if (persisted.StudentProfileId != profile.Id ||
+                persisted.Id != roadmapId ||
+                persisted.CareerProfileId != _selectedCareerId ||
+                persistedStep is null ||
+                persistedStep.IsCompleted != desiredState)
+            {
+                _progressError = ProgressUpdateError;
+                return;
+            }
+
+            _roadmap = persisted;
+            _statusAnnouncement = GetRoadmapStatusAnnouncement(
+                persisted,
+                _selectedRecommendation!.Career!.Title,
+                desiredState
+                    ? "Progress saved."
+                    : "Progress saved. A step was marked incomplete.");
+        }
+        catch
+        {
+            if (IsCurrentProgress(
+                    pageVersion,
+                    selectionVersion,
+                    progressVersion,
+                    roadmapId,
+                    stepId))
+            {
+                _progressError = ProgressUpdateError;
+            }
+        }
+        finally
+        {
+            if (IsCurrentProgress(
+                    pageVersion,
+                    selectionVersion,
+                    progressVersion,
+                    roadmapId,
+                    stepId))
+            {
+                _updatingStepId = null;
+            }
+        }
+    }
+
+    private RenderFragment RenderSkillGap(SkillGapResult skillGap) =>
+        @<section class="skill-gap-section" aria-labelledby="skill-gap-title">
+            <div class="section-heading">
+                <div>
+                    <span class="section-label">Academic MVP comparison</span>
+                    <h2 id="skill-gap-title">Skill-gap summary</h2>
+                </div>
+                <dl class="skill-counts" aria-label="Skill-gap counts">
+                    <div><dt>Missing</dt><dd>@skillGap.MissingCount</dd></div>
+                    <div>
+                        <dt>Needs development</dt>
+                        <dd>@skillGap.NeedsDevelopmentCount</dd>
+                    </div>
+                    <div><dt>Matched</dt><dd>@skillGap.MatchedCount</dd></div>
+                </dl>
+            </div>
+            <p class="baseline-note">
+                Intermediate is the academic MVP comparison baseline. It does
+                not prove professional competence, readiness, certification or
+                employability.
+            </p>
+            <div class="skill-group-grid">
+                @RenderSkillGroup("missing-skills", "Missing",
+                    SkillGapClassification.Missing)
+                @RenderSkillGroup("developing-skills", "Needs development",
+                    SkillGapClassification.NeedsDevelopment)
+                @RenderSkillGroup("matched-skills", "Matched",
+                    SkillGapClassification.Matched)
+            </div>
+        </section>;
+
+    private RenderFragment RenderSkillGroup(
+        string headingId,
+        string heading,
+        SkillGapClassification classification) =>
+        @<section class="skill-group" aria-labelledby="@headingId">
+            <h3 id="@headingId">@heading</h3>
+            @{ var items = GetSkillItems(classification); }
+            @if (items.Count == 0)
+            {
+                <p class="empty-group">No skills in this group.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var item in items)
+                    {
+                        <li>
+                            <strong>@item.RequiredSkillName</strong>
+                            @if (item.MatchedStudentSkillName is not null &&
+                                 item.CurrentProficiency is not null)
+                            {
+                                <span>
+                                    Saved as @item.MatchedStudentSkillName
+                                    — @item.CurrentProficiency
+                                </span>
+                            }
+                            else
+                            {
+                                <span>No recognized saved skill match</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>;
+
+    private RenderFragment RenderRoadmap(RoadmapModel roadmap) =>
+        @<section class="roadmap-results"
+                  aria-labelledby="roadmap-results-title"
+                  aria-busy="@(_updatingStepId is not null)">
+            <div class="roadmap-summary">
+                <div>
+                    <span class="section-label">Saved learning roadmap</span>
+                    <h2 id="roadmap-results-title">
+                        @_selectedRecommendation!.Career!.Title
+                    </h2>
+                    <p>
+                        Created
+                        <time datetime="@FormatDateTimeAttribute(roadmap.CreatedAt)">
+                            @FormatUtc(roadmap.CreatedAt)
+                        </time>
+                    </p>
+                </div>
+                <dl class="progress-counts">
+                    <div><dt>Total steps</dt><dd>@roadmap.Steps.Count</dd></div>
+                    <div><dt>Completed</dt><dd>@GetCompletedCount(roadmap)</dd></div>
+                    <div><dt>Remaining</dt><dd>@GetRemainingCount(roadmap)</dd></div>
+                </dl>
+            </div>
+
+            <div class="roadmap-progress">
+                <label for="roadmap-progress">
+                    Overall progress: @GetProgressPercentage(roadmap)%
+                </label>
+                <progress id="roadmap-progress"
+                          max="@roadmap.Steps.Count"
+                          value="@GetCompletedCount(roadmap)">
+                    @GetProgressPercentage(roadmap)%
+                </progress>
+            </div>
+
+            @if (IsRoadmapComplete(roadmap))
+            {
+                <div class="completion-status">
+                    <span aria-hidden="true">✓</span>
+                    <div>
+                        <h3>Roadmap Complete</h3>
+                        <p>
+                            Every saved step is marked complete. You can still
+                            mark a step incomplete if your progress changes.
+                        </p>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_progressError))
+            {
+                <div class="inline-alert" role="alert">
+                    <h3>Progress could not be updated</h3>
+                    <p>@_progressError</p>
+                </div>
+            }
+
+            <ol class="roadmap-step-list">
+                @foreach (var step in GetOrderedSteps(roadmap))
+                {
+                    var category = GetStepCategory(step.Title);
+                    var isBusy = _updatingStepId == step.Id;
+
+                    <li @key="step.Id"
+                        class="roadmap-step @(step.IsCompleted ? "roadmap-step-complete" : null)"
+                        aria-busy="@isBusy">
+                        <article aria-labelledby="@($"step-{step.Id}")">
+                            <div class="step-order" aria-label="Step @step.Order">
+                                @step.Order
+                            </div>
+                            <div class="step-content">
+                                <span class="step-category @category.CssClass">
+                                    @category.Label
+                                </span>
+                                <h3 id="@($"step-{step.Id}")">@step.Title</h3>
+                                <p>@step.Description</p>
+                                <p class="step-state">
+                                    <strong>
+                                        @(step.IsCompleted ? "Completed" : "Not completed")
+                                    </strong>
+                                    @if (step.CompletedAt is DateTime completedAt)
+                                    {
+                                        <span>
+                                            on
+                                            <time datetime="@FormatDateTimeAttribute(completedAt)">
+                                                @FormatUtc(completedAt)
+                                            </time>
+                                        </span>
+                                    }
+                                </p>
+                            </div>
+                            <div class="step-action">
+                                <button type="button"
+                                        class="btn @(step.IsCompleted ? "btn-outline-secondary" : "btn-outline-primary")"
+                                        disabled="@(_updatingStepId is not null)"
+                                        aria-label="@GetProgressActionLabel(step)"
+                                        @onclick="() => UpdateProgressAsync(step)">
+                                    @if (isBusy)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"
+                                              aria-hidden="true"></span>
+                                        <span>Saving…</span>
+                                    }
+                                    else
+                                    {
+                                        <span>
+                                            @(step.IsCompleted
+                                                ? "Mark incomplete"
+                                                : "Mark complete")
+                                        </span>
+                                    }
+                                </button>
+                            </div>
+                        </article>
+                    </li>
+                }
+            </ol>
+        </section>;
+
+    private async Task ReloadAsync() => await LoadPageAsync();
+
+    private void ResetPageState()
+    {
+        _profile = null;
+        _latestSession = null;
+        _selectedRecommendation = null;
+        _selectedCareerId = null;
+        _skillGap = null;
+        _roadmap = null;
+        _requiresProfile = false;
+        _requiresRecommendations = false;
+        _roadmapUnavailable = false;
+        _isSelectionLoading = false;
+        _isGeneratingRoadmap = false;
+        _updatingStepId = null;
+        _pageError = string.Empty;
+        _selectionError = string.Empty;
+        _roadmapActionError = string.Empty;
+        _progressError = string.Empty;
+        _statusAnnouncement = string.Empty;
+    }
+
+    private void InvalidateChildOperations()
+    {
+        _selectionVersion++;
+        _roadmapActionVersion++;
+        _progressVersion++;
+    }
+
+    private bool IsCurrentPageLoad(long version) =>
+        !_disposed && version == _pageLoadVersion;
+
+    private bool IsCurrentSelection(
+        long pageVersion,
+        long selectionVersion,
+        Guid careerId) =>
+        IsCurrentPageLoad(pageVersion) &&
+        selectionVersion == _selectionVersion &&
+        _selectedCareerId == careerId;
+
+    private bool IsCurrentRoadmapAction(
+        long pageVersion,
+        long selectionVersion,
+        long actionVersion,
+        Guid careerId) =>
+        IsCurrentSelection(pageVersion, selectionVersion, careerId) &&
+        actionVersion == _roadmapActionVersion;
+
+    private bool IsCurrentProgress(
+        long pageVersion,
+        long selectionVersion,
+        long progressVersion,
+        Guid roadmapId,
+        Guid stepId) =>
+        IsCurrentPageLoad(pageVersion) &&
+        selectionVersion == _selectionVersion &&
+        progressVersion == _progressVersion &&
+        _roadmap?.Id == roadmapId &&
+        _updatingStepId == stepId;
+
+    private bool IsSelected(Guid careerId) => _selectedCareerId == careerId;
+
+    private IReadOnlyList<SkillGapItem> GetSkillItems(
+        SkillGapClassification classification) =>
+        _skillGap?.Items
+            .Where(item => item.Classification == classification)
+            .ToList() ?? [];
+
+    private static IReadOnlyList<RoadmapStep> GetOrderedSteps(
+        RoadmapModel roadmap) =>
+        roadmap.Steps
+            .OrderBy(step => step.Order)
+            .ThenBy(step => step.Id)
+            .ToList();
+
+    private static StepCategory GetStepCategory(string title)
+    {
+        if (title.StartsWith("Build foundation: ", StringComparison.Ordinal) ||
+            title.StartsWith("Develop further: ", StringComparison.Ordinal))
+        {
+            return new("Skill development", "step-category-skill");
+        }
+
+        if (title.StartsWith("Study topic: ", StringComparison.Ordinal))
+        {
+            return new("Learning topic", "step-category-topic");
+        }
+
+        if (title.StartsWith(
+                "Explore certification: ",
+                StringComparison.Ordinal))
+        {
+            return new(
+                "Certification exploration",
+                "step-category-certification");
+        }
+
+        return new("Roadmap guidance", "step-category-guidance");
+    }
+
+    private static int GetCompletedCount(RoadmapModel roadmap) =>
+        roadmap.Steps.Count(step => step.IsCompleted);
+
+    private static int GetRemainingCount(RoadmapModel roadmap) =>
+        roadmap.Steps.Count - GetCompletedCount(roadmap);
+
+    private static int GetProgressPercentage(RoadmapModel roadmap) =>
+        roadmap.Steps.Count == 0
+            ? 0
+            : (int)Math.Round(
+                GetCompletedCount(roadmap) * 100d / roadmap.Steps.Count);
+
+    private static bool IsRoadmapComplete(RoadmapModel roadmap) =>
+        roadmap.Steps.Count > 0 &&
+        GetCompletedCount(roadmap) == roadmap.Steps.Count;
+
+    private static string GetRoadmapStatusAnnouncement(
+        RoadmapModel roadmap,
+        string careerTitle,
+        string prefix)
+    {
+        var completed = GetCompletedCount(roadmap);
+        var total = roadmap.Steps.Count;
+        var completion = completed == total
+            ? " Roadmap complete."
+            : string.Empty;
+
+        return $"{prefix} {careerTitle}: {completed} of {total} steps " +
+            $"completed.{completion}";
+    }
+
+    private static string GetProgressActionLabel(RoadmapStep step) =>
+        step.IsCompleted
+            ? $"Mark {step.Title} incomplete"
+            : $"Mark {step.Title} complete";
+
+    private static string FormatMatchScore(double score) =>
+        $"{Math.Round(score * 100):0}%";
+
+    private static string FormatUtc(DateTime value) =>
+        value.ToUniversalTime().ToString("dd MMM yyyy 'at' HH:mm 'UTC'");
+
+    private static string FormatDateTimeAttribute(DateTime value) =>
+        value.ToUniversalTime().ToString("O");
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _pageLoadVersion++;
+        InvalidateChildOperations();
+    }
+
+    private const string PageLoadError =
+        "Your saved roadmap information could not be loaded. Please try again.";
+    private const string SkillGapLoadError =
+        "The skill-gap comparison for this career could not be loaded. " +
+        "Please choose the career again or try later.";
+    private const string RoadmapActionError =
+        "The learning roadmap could not be generated or reopened. " +
+        "No replacement roadmap has been displayed.";
+    private const string ProgressUpdateError =
+        "Your progress could not be saved. The previously loaded roadmap " +
+        "remains displayed; please try again.";
+
+    private sealed record StepCategory(string Label, string CssClass);
+}
