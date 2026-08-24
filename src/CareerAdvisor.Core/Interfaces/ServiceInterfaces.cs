@@ -40,13 +40,15 @@ public interface ISkillGapService
 }
 
 /// <summary>
-/// Distinct history contract (Issue #1): provides access to a student's
+/// Distinct history contract: provides access to a student's
 /// past recommendation sessions.
 /// </summary>
 public interface IRecommendationHistoryService
 {
     Task<IEnumerable<RecommendationSession>> GetHistoryAsync(Guid studentProfileId);
-    Task<RecommendationSession?> GetSessionAsync(Guid sessionId);
+    Task<RecommendationSession?> GetSessionAsync(
+        Guid studentProfileId,
+        Guid sessionId);
 }
 
 public interface IRoadmapService

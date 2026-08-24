@@ -59,6 +59,10 @@ builder.Services.AddScoped<
     IRecommendationService,
     RecommendationService>();
 
+builder.Services.AddScoped<
+    IRecommendationHistoryService,
+    RecommendationHistoryService>();
+
 builder.Services.AddScoped<StudentProfileValidator>();
 builder.Services.AddScoped<SkillGapResultValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
