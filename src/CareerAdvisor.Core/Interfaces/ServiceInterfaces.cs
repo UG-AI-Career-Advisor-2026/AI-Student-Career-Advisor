@@ -51,8 +51,22 @@ public interface IRecommendationHistoryService
         Guid sessionId);
 }
 
+/// <summary>
+/// Generates, reads, and updates persisted profile-scoped learning roadmaps.
+/// </summary>
 public interface IRoadmapService
 {
-    Task<LearningRoadmap> GenerateRoadmapAsync(Guid studentProfileId, Guid careerProfileId);
-    Task UpdateRoadmapProgressAsync(Guid roadmapId, Guid stepId);
+    Task<LearningRoadmap> GenerateRoadmapAsync(
+        Guid studentProfileId,
+        Guid careerProfileId);
+
+    Task<LearningRoadmap> GetRoadmapAsync(
+        Guid studentProfileId,
+        Guid roadmapId);
+
+    Task<LearningRoadmap> UpdateRoadmapProgressAsync(
+        Guid studentProfileId,
+        Guid roadmapId,
+        Guid stepId,
+        bool isCompleted);
 }

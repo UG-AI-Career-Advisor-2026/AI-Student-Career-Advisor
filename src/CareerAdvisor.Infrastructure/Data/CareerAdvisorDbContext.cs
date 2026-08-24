@@ -1,4 +1,5 @@
 using CareerAdvisor.Core.Models;
+using CareerAdvisor.Core.Validators;
 using Microsoft.EntityFrameworkCore;
 
 namespace CareerAdvisor.Infrastructure.Data;
@@ -189,6 +190,19 @@ public class CareerAdvisorDbContext(
 
         entity.HasKey(roadmap => roadmap.Id);
 
+        entity.Property(roadmap => roadmap.CreatedAt)
+            .IsRequired()
+            .HasConversion(
+                value => value,
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
+
+        entity.HasIndex(roadmap => new
+            {
+                roadmap.StudentProfileId,
+                roadmap.CareerProfileId
+            })
+            .IsUnique();
+
         entity.HasOne<StudentProfile>()
             .WithMany()
             .HasForeignKey(roadmap => roadmap.StudentProfileId)
@@ -201,7 +215,7 @@ public class CareerAdvisorDbContext(
 
         entity.HasMany(roadmap => roadmap.Steps)
             .WithOne()
-            .HasForeignKey("LearningRoadmapId")
+            .HasForeignKey(step => step.LearningRoadmapId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 
@@ -212,13 +226,30 @@ public class CareerAdvisorDbContext(
 
         entity.HasKey(step => step.Id);
 
+        entity.Property(step => step.LearningRoadmapId)
+            .IsRequired();
+
+        entity.Property(step => step.CompletedAt)
+            .HasConversion(
+                value => value,
+                value => value.HasValue
+                    ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+                    : null);
+
+        entity.HasIndex(step => new
+            {
+                step.LearningRoadmapId,
+                step.Order
+            })
+            .IsUnique();
+
         entity.Property(step => step.Title)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(LearningRoadmapValidator.MaximumTitleLength);
 
         entity.Property(step => step.Description)
             .IsRequired()
-            .HasMaxLength(1000);
+            .HasMaxLength(LearningRoadmapValidator.MaximumDescriptionLength);
 
         entity.Property(step => step.ResourceLink)
             .HasMaxLength(1000);
