@@ -28,4 +28,26 @@ public class SkillGapResult
 
     /// <summary>Gets or sets one comparison item per required skill.</summary>
     public List<SkillGapItem> Items { get; set; } = new();
+
+    /// <summary>
+    /// Gets the derived number of required skills with no recognized match.
+    /// </summary>
+    public int MissingCount => CountItems(SkillGapClassification.Missing);
+
+    /// <summary>
+    /// Gets the derived number of matched Beginner skills requiring development.
+    /// </summary>
+    public int NeedsDevelopmentCount =>
+        CountItems(SkillGapClassification.NeedsDevelopment);
+
+    /// <summary>
+    /// Gets the derived number of skills meeting the academic MVP baseline.
+    /// </summary>
+    public int MatchedCount => CountItems(SkillGapClassification.Matched);
+
+    private int CountItems(SkillGapClassification classification)
+    {
+        return Items?.Count(item =>
+            item is not null && item.Classification == classification) ?? 0;
+    }
 }
