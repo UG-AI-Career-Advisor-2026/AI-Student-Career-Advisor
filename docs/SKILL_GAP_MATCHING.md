@@ -116,9 +116,9 @@ collection order.
 The original catalogue requirement and original saved skill names are preserved
 for display. Normalized strings are comparison values only.
 
-The same saved student skill may match two different career requirements. Global
-allocation of saved skills across requirements is intentionally not performed by
-these primitives and belongs to the later analysis-service workflow.
+The analysis service evaluates every career requirement independently, so the
+same saved student skill may match different requirements. Global allocation of
+saved skills across requirements is intentionally not performed.
 
 ## Validation
 

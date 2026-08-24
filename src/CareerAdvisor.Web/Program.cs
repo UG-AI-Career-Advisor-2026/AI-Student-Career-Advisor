@@ -45,6 +45,7 @@ builder.Services.AddSingleton<ICareerModelPredictor>(
 
 builder.Services.AddScoped<ICareerService, CareerService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
 builder.Services.AddScoped<
     IStudentProfileRepository,
@@ -63,6 +64,7 @@ builder.Services.AddScoped<
     RecommendationHistoryService>();
 
 builder.Services.AddScoped<StudentProfileValidator>();
+builder.Services.AddScoped<SkillGapResultValidator>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 builder.Services.AddScoped<CareerCatalogSynchronizer>();
 

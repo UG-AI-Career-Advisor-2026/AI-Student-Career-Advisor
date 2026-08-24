@@ -25,6 +25,21 @@ public interface IRecommendationService
 }
 
 /// <summary>
+/// Performs a deterministic comparison between a saved profile and a supported
+/// career's required skills.
+/// </summary>
+public interface ISkillGapService
+{
+    /// <summary>Analyzes the saved skills for one profile and career.</summary>
+    /// <param name="studentProfileId">The saved student profile identifier.</param>
+    /// <param name="careerProfileId">The supported career identifier.</param>
+    /// <returns>A validated deterministic skill-gap result.</returns>
+    Task<SkillGapResult> AnalyzeAsync(
+        Guid studentProfileId,
+        Guid careerProfileId);
+}
+
+/// <summary>
 /// Distinct history contract: provides access to a student's
 /// past recommendation sessions.
 /// </summary>
