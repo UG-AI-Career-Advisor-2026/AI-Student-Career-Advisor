@@ -168,6 +168,43 @@ public class RecommendationRepositoryTests
     }
 
     [Fact]
+    public async Task GetByStudentProfileIdAsync_EqualTimesUseSessionIdTieBreak()
+    {
+        await using var connection =
+            new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = CreateOptions(connection);
+        var profile = CreateProfile();
+        var careers = CreateCareers();
+        var generatedAt = new DateTime(2026, 8, 25, 12, 0, 0,
+            DateTimeKind.Utc);
+        var lowerId = Guid.Parse("10000000-0000-0000-0000-000000000000");
+        var higherId = Guid.Parse("20000000-0000-0000-0000-000000000000");
+
+        await using (var writeContext = new CareerAdvisorDbContext(options))
+        {
+            await writeContext.Database.EnsureCreatedAsync();
+            writeContext.StudentProfiles.Add(profile);
+            writeContext.CareerProfiles.AddRange(careers);
+            await writeContext.SaveChangesAsync();
+            var repository = new RecommendationRepository(writeContext);
+            var higher = CreateSession(profile.Id, careers, generatedAt);
+            higher.Id = higherId;
+            var lower = CreateSession(profile.Id, careers, generatedAt);
+            lower.Id = lowerId;
+            await repository.AddAsync(higher);
+            await repository.AddAsync(lower);
+        }
+
+        await using var readContext = new CareerAdvisorDbContext(options);
+        var sessions = (await new RecommendationRepository(readContext)
+                .GetByStudentProfileIdAsync(profile.Id))
+            .ToList();
+
+        Assert.Equal([lowerId, higherId], sessions.Select(session => session.Id));
+    }
+
+    [Fact]
     public async Task AddAsync_RejectsRecommendationForUnknownCareer()
     {
         await using var connection =

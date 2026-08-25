@@ -31,6 +31,7 @@ public sealed class RecommendationRepository : IRecommendationRepository
             .Include(session => session.Recommendations)
                 .ThenInclude(recommendation => recommendation.Career)
             .OrderByDescending(session => session.GeneratedAt)
+            .ThenBy(session => session.Id)
             .ToListAsync();
     }
 
@@ -44,6 +45,7 @@ public sealed class RecommendationRepository : IRecommendationRepository
             .Include(session => session.Recommendations)
                 .ThenInclude(recommendation => recommendation.Career)
             .OrderByDescending(session => session.GeneratedAt)
+            .ThenBy(session => session.Id)
             .ToListAsync();
     }
 

@@ -10,6 +10,8 @@ namespace CareerAdvisor.Infrastructure.Services;
 /// </summary>
 public sealed class RecommendationService : IRecommendationService
 {
+    private static readonly SemaphoreSlim PersistenceGate = new(1, 1);
+
     private readonly IStudentProfileRepository _profileRepository;
     private readonly IAssessmentService _assessmentService;
     private readonly ICareerRepository _careerRepository;
@@ -38,6 +40,15 @@ public sealed class RecommendationService : IRecommendationService
     public async Task<RecommendationSession>
         GenerateRecommendationsAsync(Guid studentProfileId)
     {
+        var outcome = await GenerateRecommendationsWithOutcomeAsync(
+            studentProfileId);
+
+        return outcome.Session;
+    }
+
+    public async Task<RecommendationGenerationResult>
+        GenerateRecommendationsWithOutcomeAsync(Guid studentProfileId)
+    {
         if (studentProfileId == Guid.Empty)
         {
             throw new InvalidOperationException(
@@ -48,7 +59,7 @@ public sealed class RecommendationService : IRecommendationService
         var profile = await _profileRepository.GetByIdAsync(
             studentProfileId);
 
-        if (profile is null)
+        if (profile is null || profile.Id != studentProfileId)
         {
             throw new InvalidOperationException(
                 "The requested student profile could not be found.");
@@ -113,33 +124,153 @@ public sealed class RecommendationService : IRecommendationService
 
         ValidateTopRecommendations(recommendations);
 
-        var session = new RecommendationSession
+        var candidateSession = new RecommendationSession
         {
             StudentProfileId = profile.Id,
-            GeneratedAt = DateTime.UtcNow,
             Recommendations = recommendations
         };
 
-        await _recommendationRepository.AddAsync(session);
+        await PersistenceGate.WaitAsync();
 
-        var savedSession =
-            await _recommendationRepository.GetByIdAsync(
-                session.Id);
-
-        if (savedSession is null)
+        try
         {
-            throw new InvalidOperationException(
-                "The generated recommendation session could not " +
-                "be reopened after it was saved.");
-        }
+            var ownedSessions = await _recommendationRepository
+                .GetByStudentProfileIdAsync(profile.Id);
 
-        savedSession.Recommendations = savedSession
-            .Recommendations
+            if (ownedSessions is null)
+            {
+                throw InvalidLatestSession();
+            }
+
+            var ownedSessionList = ownedSessions.ToList();
+
+            if (ownedSessionList.Any(session => session is null))
+            {
+                throw InvalidLatestSession();
+            }
+
+            var latestSession = ownedSessionList
+                .OrderByDescending(session => session.GeneratedAt)
+                .ThenBy(session => session.Id)
+                .FirstOrDefault();
+
+            if (latestSession is not null)
+            {
+                ValidatePersistedSession(latestSession, profile.Id);
+                OrderRecommendations(latestSession);
+
+                if (HasEquivalentPayload(
+                        latestSession,
+                        candidateSession))
+                {
+                    return new RecommendationGenerationResult(
+                        latestSession,
+                        WasNewlyPersisted: false);
+                }
+            }
+
+            candidateSession.GeneratedAt = DateTime.UtcNow;
+            await _recommendationRepository.AddAsync(candidateSession);
+
+            var savedSession =
+                await _recommendationRepository.GetByIdAsync(
+                    candidateSession.Id);
+
+            if (savedSession is null)
+            {
+                throw new InvalidOperationException(
+                    "The generated recommendation session could not " +
+                    "be reopened after it was saved.");
+            }
+
+            ValidatePersistedSession(savedSession, profile.Id);
+            OrderRecommendations(savedSession);
+
+            return new RecommendationGenerationResult(
+                savedSession,
+                WasNewlyPersisted: true);
+        }
+        finally
+        {
+            PersistenceGate.Release();
+        }
+    }
+
+    private static bool HasEquivalentPayload(
+        RecommendationSession persisted,
+        RecommendationSession candidate)
+    {
+        var persistedRecommendations = GetRankedRecommendations(
+            persisted.Recommendations);
+        var candidateRecommendations = GetRankedRecommendations(
+            candidate.Recommendations);
+
+        return persistedRecommendations
+            .Zip(candidateRecommendations)
+            .All(pair =>
+                pair.First.CareerProfileId == pair.Second.CareerProfileId &&
+                pair.First.MatchScore.Equals(pair.Second.MatchScore) &&
+                string.Equals(
+                    pair.First.Reasoning,
+                    pair.Second.Reasoning,
+                    StringComparison.Ordinal));
+    }
+
+    private static void ValidatePersistedSession(
+        RecommendationSession session,
+        Guid studentProfileId)
+    {
+        if (session.StudentProfileId != studentProfileId ||
+            session.Id == Guid.Empty ||
+            session.GeneratedAt == default ||
+            session.Recommendations is null ||
+            session.Recommendations.Count != 3 ||
+            session.Recommendations.Any(recommendation =>
+                recommendation is null ||
+                recommendation.Career is null ||
+                string.IsNullOrWhiteSpace(recommendation.Career.Title) ||
+                string.IsNullOrWhiteSpace(recommendation.Career.Description) ||
+                recommendation.CareerProfileId == Guid.Empty ||
+                !double.IsFinite(recommendation.MatchScore) ||
+                recommendation.MatchScore < 0 ||
+                recommendation.MatchScore > 1 ||
+                string.IsNullOrWhiteSpace(recommendation.Reasoning)) ||
+            session.Recommendations
+                .Select(recommendation => recommendation.CareerProfileId)
+                .Distinct()
+                .Count() != 3)
+        {
+            throw InvalidLatestSession();
+        }
+    }
+
+    private static void OrderRecommendations(RecommendationSession session)
+    {
+        session.Recommendations = GetRankedRecommendations(
+                session.Recommendations)
+            .ToList();
+    }
+
+    private static IReadOnlyList<CareerRecommendation>
+        GetRankedRecommendations(
+            IEnumerable<CareerRecommendation> recommendations)
+    {
+        return recommendations
             .OrderByDescending(recommendation =>
                 recommendation.MatchScore)
+            .ThenBy(
+                recommendation => recommendation.Career!.Title,
+                StringComparer.Ordinal)
+            .ThenBy(recommendation =>
+                recommendation.CareerProfileId)
             .ToList();
+    }
 
-        return savedSession;
+    private static InvalidOperationException InvalidLatestSession()
+    {
+        return new InvalidOperationException(
+            "The latest saved recommendation session is invalid. " +
+            "No new recommendations were saved.");
     }
 
     private static IReadOnlyList<NormalizedCareerScore>

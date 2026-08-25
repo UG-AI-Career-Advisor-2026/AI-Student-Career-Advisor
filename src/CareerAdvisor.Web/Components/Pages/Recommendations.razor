@@ -26,11 +26,22 @@
         </p>
     </header>
 
-    <div aria-live="polite">
+    <div class="visually-hidden" role="status" aria-atomic="true">
+        @_statusAnnouncement
+    </div>
+
+    <div>
         @if (!string.IsNullOrWhiteSpace(_generationErrorMessage))
         {
             <div class="alert alert-danger" role="alert">
                 @_generationErrorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_generationStatusMessage))
+        {
+            <div class="alert alert-success" role="status">
+                @_generationStatusMessage
             </div>
         }
 
@@ -248,6 +259,8 @@
 
     private string _errorMessage = string.Empty;
     private string _generationErrorMessage = string.Empty;
+    private string _generationStatusMessage = string.Empty;
+    private string _statusAnnouncement = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -270,6 +283,8 @@
             if (profile is null)
             {
                 _requiresProfile = true;
+                _statusAnnouncement =
+                    "A saved student profile is required for recommendations.";
                 return;
             }
 
@@ -283,6 +298,8 @@
             if (completedAssessment is null)
             {
                 _requiresAssessment = true;
+                _statusAnnouncement =
+                    "A completed career assessment is required for recommendations.";
                 return;
             }
 
@@ -300,11 +317,18 @@
                 {
                     ValidateSavedSession(latestSession);
                     _session = latestSession;
+                    _statusAnnouncement =
+                        "Latest saved recommendations loaded.";
                 }
                 catch (InvalidOperationException exception)
                 {
                     _generationErrorMessage = exception.Message;
                 }
+            }
+            else
+            {
+                _statusAnnouncement =
+                    "Profile and assessment loaded. Recommendations are ready to generate.";
             }
         }
         catch (InvalidOperationException exception)
@@ -333,27 +357,34 @@
         }
 
         _generationErrorMessage = string.Empty;
+        _generationStatusMessage = string.Empty;
+        _statusAnnouncement = string.Empty;
         _isGenerating = true;
 
         try
         {
-            var generatedSession =
+            var outcome =
                 await RecommendationService
-                    .GenerateRecommendationsAsync(
+                    .GenerateRecommendationsWithOutcomeAsync(
                         profile.Id);
 
-            ValidateSavedSession(generatedSession);
-            _session = generatedSession;
+            ValidateSavedSession(outcome.Session);
+            _session = outcome.Session;
+            _generationStatusMessage = outcome.WasNewlyPersisted
+                ? "New career recommendations were generated and saved."
+                : "Your recommendations are unchanged, so your existing " +
+                  "saved results were kept.";
         }
         catch (InvalidOperationException exception)
         {
-            _generationErrorMessage = exception.Message;
+            _generationErrorMessage = IsApprovedGenerationMessage(
+                    exception.Message)
+                ? exception.Message
+                : GenericGenerationFailureMessage;
         }
         catch
         {
-            _generationErrorMessage =
-                "CareerIQ could not generate recommendations. " +
-                "Your previous saved results have not been replaced.";
+            _generationErrorMessage = GenericGenerationFailureMessage;
         }
         finally
         {
@@ -374,6 +405,8 @@
         _requiresAssessment = false;
         _errorMessage = string.Empty;
         _generationErrorMessage = string.Empty;
+        _generationStatusMessage = string.Empty;
+        _statusAnnouncement = string.Empty;
     }
 
     private static void ValidateSavedSession(
@@ -392,6 +425,22 @@
                 "The saved recommendation results are incomplete. " +
                 "Please generate them again.");
         }
+    }
+
+    private static bool IsApprovedGenerationMessage(string message)
+    {
+        return message is
+            "A valid saved student profile is required before recommendations can be generated." or
+            "The requested student profile could not be found." or
+            "A completed career assessment is required before recommendations can be generated." or
+            "A valid saved student profile is required." or
+            "The student profile must include a programme." or
+            "The student profile contains an invalid academic level." or
+            "The completed assessment does not belong to the requested student profile." or
+            "The completed assessment must contain answers to all 15 questions." or
+            "The assessment contains duplicate question responses." or
+            "The latest saved recommendation session is invalid. No new recommendations were saved." or
+            "The generated recommendation session could not be reopened after it was saved.";
     }
 
     private IReadOnlyList<RankedRecommendation>
@@ -437,4 +486,8 @@
     private sealed record RankedRecommendation(
         int Rank,
         CareerRecommendation Recommendation);
+
+    private const string GenericGenerationFailureMessage =
+        "CareerIQ could not generate recommendations. " +
+        "Your previous saved results have not been replaced.";
 }
