@@ -108,8 +108,8 @@
 
 .interest-chip button {
     display: inline-grid;
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 2rem;
+    height: 2rem;
     padding: 0;
     place-items: center;
     color: #173b70;
@@ -119,10 +119,17 @@
     border-radius: 50%;
 }
 
-.interest-chip button:hover,
+.interest-chip button:hover {
+    color: #ffffff;
+    background: #275ba5;
+}
+
 .interest-chip button:focus-visible {
     color: #ffffff;
     background: #275ba5;
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px #071a33;
 }
 
 .skill-entry,

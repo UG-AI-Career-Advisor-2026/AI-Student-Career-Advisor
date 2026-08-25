@@ -112,8 +112,7 @@
                     }
                 </legend>
 
-                <div role="radiogroup"
-                     aria-label="@currentQuestion.Text">
+                <div>
                     @foreach (var option in currentQuestion.Options)
                     {
                         var isSelected =
@@ -144,8 +143,7 @@
             @if (!string.IsNullOrWhiteSpace(_validationMessage))
             {
                 <div class="alert alert-danger"
-                     role="alert"
-                     aria-live="assertive">
+                     role="alert">
                     @_validationMessage
                 </div>
             }

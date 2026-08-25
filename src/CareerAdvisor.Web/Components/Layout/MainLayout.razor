@@ -8,7 +8,7 @@
     </div>
 
     <main>
-        <article id="main-content" class="content px-4" aria-label="Main content">
+        <article id="main-content" class="content px-4" aria-label="Main content" tabindex="-1">
             @Body
         </article>
     </main>
@@ -17,5 +17,7 @@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <button type="button" class="dismiss" aria-label="Dismiss error">
+        Dismiss
+    </button>
 </div>

@@ -157,7 +157,10 @@
                     </h2>
 
                     <p>
-                        Generated @FormatGeneratedAt(_session.GeneratedAt)
+                        Generated
+                        <time datetime="@FormatDateTimeAttribute(_session.GeneratedAt)">
+                            @FormatGeneratedAt(_session.GeneratedAt)
+                        </time>
                     </p>
                 </div>
 
@@ -315,14 +318,17 @@
             {
                 try
                 {
-                    ValidateSavedSession(latestSession);
+                    ValidateSavedSession(latestSession, profile.Id);
                     _session = latestSession;
                     _statusAnnouncement =
                         "Latest saved recommendations loaded.";
                 }
                 catch (InvalidOperationException exception)
                 {
-                    _generationErrorMessage = exception.Message;
+                    _generationErrorMessage =
+                        IsApprovedLoadMessage(exception.Message)
+                            ? exception.Message
+                            : GenericLoadFailureMessage;
                 }
             }
             else
@@ -333,7 +339,9 @@
         }
         catch (InvalidOperationException exception)
         {
-            _errorMessage = exception.Message;
+            _errorMessage = IsApprovedLoadMessage(exception.Message)
+                ? exception.Message
+                : GenericLoadFailureMessage;
         }
         catch
         {
@@ -368,7 +376,7 @@
                     .GenerateRecommendationsWithOutcomeAsync(
                         profile.Id);
 
-            ValidateSavedSession(outcome.Session);
+            ValidateSavedSession(outcome.Session, profile.Id);
             _session = outcome.Session;
             _generationStatusMessage = outcome.WasNewlyPersisted
                 ? "New career recommendations were generated and saved."
@@ -410,20 +418,72 @@
     }
 
     private static void ValidateSavedSession(
-        RecommendationSession session)
+        RecommendationSession session,
+        Guid expectedProfileId)
     {
-        if (session.Recommendations.Count != 3 ||
-            session.Recommendations.Any(recommendation =>
-                recommendation.Career is null) ||
-            session.Recommendations
+        var recommendations = session.Recommendations;
+
+        if (expectedProfileId == Guid.Empty ||
+            session.StudentProfileId == Guid.Empty ||
+            session.StudentProfileId != expectedProfileId ||
+            session.Id == Guid.Empty ||
+            !CanPresentTimestamp(session.GeneratedAt) ||
+            recommendations is null ||
+            recommendations.Count != 3 ||
+            recommendations.Any(recommendation =>
+                recommendation is null ||
+                recommendation.Id == Guid.Empty ||
+                recommendation.RecommendationSessionId != session.Id ||
+                recommendation.Career is null ||
+                recommendation.CareerProfileId == Guid.Empty ||
+                recommendation.Career.Id !=
+                    recommendation.CareerProfileId ||
+                string.IsNullOrWhiteSpace(
+                    recommendation.Career.Title) ||
+                string.IsNullOrWhiteSpace(
+                    recommendation.Career.Description) ||
+                string.IsNullOrWhiteSpace(
+                    recommendation.Reasoning) ||
+                !double.IsFinite(recommendation.MatchScore) ||
+                recommendation.MatchScore < 0 ||
+                recommendation.MatchScore > 1) ||
+            recommendations
                 .Select(recommendation =>
                     recommendation.CareerProfileId)
+                .Distinct()
+                .Count() != 3 ||
+            recommendations
+                .Select(recommendation =>
+                    recommendation.Id)
                 .Distinct()
                 .Count() != 3)
         {
             throw new InvalidOperationException(
                 "The saved recommendation results are incomplete. " +
                 "Please generate them again.");
+        }
+    }
+
+    private static bool CanPresentTimestamp(DateTime generatedAt)
+    {
+        if (generatedAt == default)
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = generatedAt.ToUniversalTime();
+            _ = generatedAt.ToLocalTime();
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (OverflowException)
+        {
+            return false;
         }
     }
 
@@ -454,6 +514,11 @@
         return _session.Recommendations
             .OrderByDescending(recommendation =>
                 recommendation.MatchScore)
+            .ThenBy(
+                recommendation => recommendation.Career!.Title,
+                StringComparer.Ordinal)
+            .ThenBy(recommendation =>
+                recommendation.CareerProfileId)
             .Select((recommendation, index) =>
                 new RankedRecommendation(
                     index + 1,
@@ -483,6 +548,17 @@
             .ToString("dd MMM yyyy 'at' h:mm tt");
     }
 
+    private static string FormatDateTimeAttribute(DateTime generatedAt)
+    {
+        return generatedAt.ToUniversalTime().ToString("O");
+    }
+
+    private static bool IsApprovedLoadMessage(string message)
+    {
+        return message is
+            "The saved recommendation results are incomplete. Please generate them again.";
+    }
+
     private sealed record RankedRecommendation(
         int Rank,
         CareerRecommendation Recommendation);
@@ -490,4 +566,8 @@
     private const string GenericGenerationFailureMessage =
         "CareerIQ could not generate recommendations. " +
         "Your previous saved results have not been replaced.";
+
+    private const string GenericLoadFailureMessage =
+        "Your saved recommendation information could not be loaded. " +
+        "Please try again.";
 }
