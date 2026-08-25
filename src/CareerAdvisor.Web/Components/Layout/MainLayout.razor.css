@@ -84,7 +84,7 @@ main {
     box-sizing: border-box;
     display: none;
     left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    padding: 0.6rem 6.25rem 0.7rem 1.25rem;
     position: fixed;
     width: 100%;
     z-index: 1000;
@@ -94,5 +94,17 @@ main {
         cursor: pointer;
         position: absolute;
         right: 0.75rem;
-        top: 0.5rem;
+        top: 0.35rem;
+        padding: 0.2rem 0.45rem;
+        color: #071a33;
+        font: inherit;
+        background: transparent;
+        border: 1px solid #071a33;
+        border-radius: 0.3rem;
+    }
+
+    #blazor-error-ui .dismiss:focus-visible {
+        outline: 2px solid #ffffff;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 5px #071a33;
     }

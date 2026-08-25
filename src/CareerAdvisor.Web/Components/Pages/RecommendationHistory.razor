@@ -267,7 +267,9 @@
         {
             if (loadVersion == _loadVersion)
             {
-                _errorMessage = exception.Message;
+                _errorMessage = IsApprovedLoadMessage(exception.Message)
+                    ? exception.Message
+                    : GenericLoadFailureMessage;
             }
         }
         catch
@@ -413,4 +415,24 @@
     {
         return generatedAt.ToUniversalTime().ToString("O");
     }
+
+    private static bool IsApprovedLoadMessage(string message)
+    {
+        return message is
+            "A valid saved student profile is required." or
+            "The requested student profile could not be found." or
+            "A valid recommendation session is required." or
+            "The saved recommendation session cannot be displayed because the saved session is unavailable." or
+            "The saved recommendation session cannot be displayed because its recommendations are unavailable." or
+            "The saved recommendation session cannot be displayed because one or more saved recommendations are unavailable." or
+            "The saved recommendation session cannot be displayed because it does not contain exactly three recommendations." or
+            "The saved recommendation session cannot be displayed because it contains duplicate careers." or
+            "The saved recommendation session cannot be displayed because one or more career details are unavailable." or
+            "The saved recommendation session cannot be displayed because one or more saved match scores are invalid." or
+            "The saved recommendation session cannot be displayed because one or more saved explanations are unavailable.";
+    }
+
+    private const string GenericLoadFailureMessage =
+        "Your saved recommendation history could not be loaded. " +
+        "Please try again.";
 }
