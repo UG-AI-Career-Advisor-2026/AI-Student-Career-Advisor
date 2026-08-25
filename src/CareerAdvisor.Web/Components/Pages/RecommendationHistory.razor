@@ -22,7 +22,11 @@
         </p>
     </header>
 
-    <div aria-live="polite">
+    <div class="visually-hidden" role="status" aria-atomic="true">
+        @_statusAnnouncement
+    </div>
+
+    <div>
         @if (_isLoading)
         {
             <section class="state-panel" role="status">
@@ -180,7 +184,18 @@
     private bool _requiresProfile;
     private bool _sessionNotFound;
     private string _errorMessage = string.Empty;
+    private string _statusAnnouncement = string.Empty;
     private long _loadVersion;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        if (!parameters.TryGetValue<Guid?>(nameof(SessionId), out _))
+        {
+            SessionId = null;
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -209,6 +224,8 @@
             if (profile is null)
             {
                 _requiresProfile = true;
+                _statusAnnouncement =
+                    "A saved student profile is required to view history.";
                 return;
             }
 
@@ -227,6 +244,9 @@
 
                 _session = session;
                 _sessionNotFound = session is null;
+                _statusAnnouncement = session is null
+                    ? string.Empty
+                    : "Saved recommendation session loaded.";
                 return;
             }
 
@@ -238,6 +258,10 @@
             }
 
             _sessions = sessions.ToList();
+            _statusAnnouncement = _sessions.Count == 0
+                ? "No saved recommendation sessions were found."
+                : $"Recommendation history loaded. " +
+                  $"{_sessions.Count} saved sessions available.";
         }
         catch (InvalidOperationException exception)
         {
@@ -277,6 +301,7 @@
         _requiresProfile = false;
         _sessionNotFound = false;
         _errorMessage = string.Empty;
+        _statusAnnouncement = string.Empty;
     }
 
     private RenderFragment RenderSessionDetails(

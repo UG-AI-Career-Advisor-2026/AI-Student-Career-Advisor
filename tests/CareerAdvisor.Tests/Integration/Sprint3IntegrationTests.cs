@@ -41,6 +41,22 @@ public sealed class Sprint3IntegrationTests
                     profile.Id);
         }
 
+        RecommendationGenerationResult repeatedOutcome;
+
+        await using (var repeatedContext = database.CreateContext())
+        {
+            using var predictor = CreateRealModelPredictor();
+            var service = CreateRecommendationService(
+                repeatedContext,
+                predictor);
+
+            repeatedOutcome = await service
+                .GenerateRecommendationsWithOutcomeAsync(profile.Id);
+        }
+
+        Assert.False(repeatedOutcome.WasNewlyPersisted);
+        Assert.Equal(generatedSession.Id, repeatedOutcome.Session.Id);
+
         Assert.NotEqual(Guid.Empty, completedAssessment.Id);
         Assert.Equal("Completed", completedAssessment.Status);
         Assert.NotNull(completedAssessment.CompletedAt);
@@ -173,6 +189,40 @@ public sealed class Sprint3IntegrationTests
         Assert.Equal(
             3,
             savedHistorySession.Recommendations.Count);
+    }
+
+    [Fact]
+    public async Task ConcurrentIdenticalGeneration_PersistsOneSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var profile = await SaveProfileAsync(database);
+        await CompleteAssessmentAsync(database, profile.Id);
+        await using var firstContext = database.CreateContext();
+        await using var secondContext = database.CreateContext();
+        using var firstPredictor = CreateRealModelPredictor();
+        using var secondPredictor = CreateRealModelPredictor();
+        var firstService = CreateRecommendationService(
+            firstContext,
+            firstPredictor);
+        var secondService = CreateRecommendationService(
+            secondContext,
+            secondPredictor);
+
+        var outcomes = await Task.WhenAll(
+            firstService.GenerateRecommendationsWithOutcomeAsync(profile.Id),
+            secondService.GenerateRecommendationsWithOutcomeAsync(profile.Id));
+
+        Assert.Single(outcomes, outcome => outcome.WasNewlyPersisted);
+        Assert.Single(outcomes, outcome => !outcome.WasNewlyPersisted);
+        Assert.Single(outcomes.Select(outcome => outcome.Session.Id).Distinct());
+
+        await using var verificationContext = database.CreateContext();
+        Assert.Equal(
+            1,
+            await verificationContext.RecommendationSessions.CountAsync());
+        Assert.Equal(
+            3,
+            await verificationContext.CareerRecommendations.CountAsync());
     }
 
     [Fact]

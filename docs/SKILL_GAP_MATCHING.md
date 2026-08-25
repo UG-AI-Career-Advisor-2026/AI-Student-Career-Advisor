@@ -3,10 +3,11 @@
 ## Purpose and Scope
 
 This document defines the deterministic Core contracts and name-matching rules
-used to support CareerIQ skill-gap analysis. The current implementation provides
-classification rules, normalization, approved aliases, pure matching primitives,
-and result validation. It does not implement the analysis service, persistence,
-roadmap generation, or a user interface.
+used by CareerIQ skill-gap analysis and persisted learning roadmaps. The current
+implementation provides classification rules, normalization, approved aliases,
+pure matching primitives, result validation and deterministic analysis through
+`ISkillGapService`. The Learning Roadmap interface presents these saved-profile
+comparisons without changing the matching rules.
 
 Career required skills always come from `CareerProfile.RequiredSkills`, which is
 loaded from `data/career-catalog.json`. The alias catalogue does not replace or

@@ -2,6 +2,7 @@ using CareerAdvisor.Core.Enums;
 using CareerAdvisor.Core.Interfaces;
 using CareerAdvisor.Core.Models;
 using CareerAdvisor.Core.Recommendations;
+using CareerAdvisor.Core.Validators;
 using CareerAdvisor.Infrastructure.Data;
 using CareerAdvisor.Infrastructure.MachineLearning;
 using CareerAdvisor.Infrastructure.Repositories;
@@ -13,6 +14,34 @@ namespace CareerAdvisor.Tests.Services;
 
 public sealed class RecommendationServiceTests
 {
+    [Fact]
+    public async Task GenerateWithOutcome_MismatchedProfileStopsBeforeDownstreamAccess()
+    {
+        var requestedId = Guid.NewGuid();
+        var assessment = new DownstreamAssessmentService();
+        var careers = new DownstreamCareerRepository();
+        var recommendations = new DownstreamRecommendationRepository();
+        var predictor = new DownstreamPredictor();
+        var service = new RecommendationService(
+            new MismatchedProfileRepository(requestedId),
+            assessment,
+            careers,
+            recommendations,
+            new RecommendationInputBuilder(),
+            predictor);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GenerateRecommendationsWithOutcomeAsync(requestedId));
+
+        Assert.Equal(
+            "The requested student profile could not be found.",
+            exception.Message);
+        Assert.Equal(0, assessment.Calls);
+        Assert.Equal(0, careers.Calls);
+        Assert.Equal(0, recommendations.Calls);
+        Assert.Equal(0, predictor.Calls);
+    }
+
     [Fact]
     public async Task GenerateRecommendationsAsync_ReturnsAndPersistsTopThree()
     {
@@ -114,6 +143,205 @@ public sealed class RecommendationServiceTests
                     string.IsNullOrWhiteSpace(
                         recommendation.Reasoning));
             });
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_IdenticalLatestSessionIsReused()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = CreateService(database, CreateValidScores());
+
+        var first = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+        var second = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+
+        Assert.True(first.WasNewlyPersisted);
+        Assert.False(second.WasNewlyPersisted);
+        Assert.Equal(first.Session.Id, second.Session.Id);
+        Assert.Equal(first.Session.GeneratedAt, second.Session.GeneratedAt);
+        Assert.Equal(
+            first.Session.Recommendations.Select(RecommendationValue),
+            second.Session.Recommendations.Select(RecommendationValue));
+        Assert.Equal(
+            1,
+            await database.Context.RecommendationSessions.CountAsync());
+        Assert.Equal(
+            3,
+            await database.Context.CareerRecommendations.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_ChangedScorePersistsNewSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var firstService = CreateService(database, CreateValidScores());
+        var first = await firstService.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+
+        var changedScores = CreateValidScores().ToList();
+        changedScores[6] = changedScores[6] with { Score = 0.41f };
+        var secondService = CreateService(database, changedScores);
+        var second = await secondService.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+
+        Assert.True(first.WasNewlyPersisted);
+        Assert.True(second.WasNewlyPersisted);
+        Assert.NotEqual(first.Session.Id, second.Session.Id);
+        Assert.Equal(
+            2,
+            await database.Context.RecommendationSessions.CountAsync());
+        Assert.Equal(
+            6,
+            await database.Context.CareerRecommendations.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_ChangedReasoningPersistsNewSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = CreateService(database, CreateValidScores());
+        var first = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+        var storedRecommendation = await database.Context.CareerRecommendations
+            .SingleAsync(recommendation =>
+                recommendation.RecommendationSessionId == first.Session.Id &&
+                recommendation.CareerProfileId ==
+                first.Session.Recommendations[0].CareerProfileId);
+        storedRecommendation.Reasoning += " Updated saved explanation.";
+        await database.Context.SaveChangesAsync();
+
+        var second = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+
+        Assert.True(second.WasNewlyPersisted);
+        Assert.NotEqual(first.Session.Id, second.Session.Id);
+        Assert.Equal(
+            2,
+            await database.Context.RecommendationSessions.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_ChangedCareerPersistsNewSession()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var first = await CreateService(database, CreateValidScores())
+            .GenerateRecommendationsWithOutcomeAsync(database.StudentProfileId);
+        var changedScores = CreateValidScores().ToList();
+        changedScores[7] = changedScores[7] with { Score = 0.30f };
+
+        var second = await CreateService(database, changedScores)
+            .GenerateRecommendationsWithOutcomeAsync(database.StudentProfileId);
+
+        Assert.True(second.WasNewlyPersisted);
+        Assert.NotEqual(first.Session.Id, second.Session.Id);
+        Assert.NotEqual(
+            first.Session.Recommendations
+                .Select(item => item.CareerProfileId)
+                .Order(),
+            second.Session.Recommendations
+                .Select(item => item.CareerProfileId)
+                .Order());
+        Assert.Equal(2, await database.Context.RecommendationSessions.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_EqualScoresReuseDespiteReversedPersistedOrder()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var equalScores = CreateValidScores().ToList();
+        equalScores[3] = equalScores[3] with { Score = 0.40f };
+        var first = await CreateService(database, equalScores)
+            .GenerateRecommendationsWithOutcomeAsync(database.StudentProfileId);
+        var reversedRepository = new ReversingRecommendationRepository(
+            new RecommendationRepository(database.Context));
+        var secondService = new RecommendationService(
+            new StudentProfileRepository(database.Context),
+            new AssessmentService(database.Context),
+            database.CareerRepository,
+            reversedRepository,
+            new RecommendationInputBuilder(),
+            new FixedCareerModelPredictor(equalScores));
+
+        var second = await secondService
+            .GenerateRecommendationsWithOutcomeAsync(database.StudentProfileId);
+
+        Assert.False(second.WasNewlyPersisted);
+        Assert.Equal(first.Session.Id, second.Session.Id);
+        Assert.Equal(
+            first.Session.Recommendations.Select(item => item.CareerProfileId),
+            second.Session.Recommendations.Select(item => item.CareerProfileId));
+        Assert.Equal(1, await database.Context.RecommendationSessions.CountAsync());
+    }
+
+    [Theory]
+    [InlineData(true, "")]
+    [InlineData(true, "   ")]
+    [InlineData(false, "")]
+    [InlineData(false, "   ")]
+    public async Task GenerateWithOutcome_BlankCareerDetailsRejectWithoutWrite(
+        bool changeTitle,
+        string invalidValue)
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = CreateService(database, CreateValidScores());
+        var first = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+        var careerId = first.Session.Recommendations[0].CareerProfileId;
+        var career = await database.Context.CareerProfiles
+            .SingleAsync(item => item.Id == careerId);
+        if (changeTitle)
+        {
+            career.Title = invalidValue;
+        }
+        else
+        {
+            career.Description = invalidValue;
+        }
+        await database.Context.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GenerateRecommendationsWithOutcomeAsync(
+                database.StudentProfileId));
+
+        Assert.Equal(
+            "The latest saved recommendation session is invalid. " +
+            "No new recommendations were saved.",
+            exception.Message);
+        Assert.Equal(1, await database.Context.RecommendationSessions.CountAsync());
+        Assert.Equal(3, await database.Context.CareerRecommendations.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateWithOutcome_MalformedNewestSessionRejectsWithoutWrite()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = CreateService(database, CreateValidScores());
+        var first = await service.GenerateRecommendationsWithOutcomeAsync(
+            database.StudentProfileId);
+
+        var storedRecommendation = await database.Context.CareerRecommendations
+            .SingleAsync(recommendation =>
+                recommendation.RecommendationSessionId == first.Session.Id &&
+                recommendation.CareerProfileId ==
+                first.Session.Recommendations[0].CareerProfileId);
+        storedRecommendation.Reasoning = " ";
+        await database.Context.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GenerateRecommendationsWithOutcomeAsync(
+                database.StudentProfileId));
+
+        Assert.Equal(
+            "The latest saved recommendation session is invalid. " +
+            "No new recommendations were saved.",
+            exception.Message);
+        Assert.Equal(
+            1,
+            await database.Context.RecommendationSessions.CountAsync());
+        Assert.Equal(
+            3,
+            await database.Context.CareerRecommendations.CountAsync());
     }
 
     [Fact]
@@ -304,6 +532,17 @@ public sealed class RecommendationServiceTests
             new FixedCareerModelPredictor(scores));
     }
 
+    private static object RecommendationValue(
+        CareerRecommendation recommendation)
+    {
+        return new
+        {
+            recommendation.CareerProfileId,
+            recommendation.MatchScore,
+            recommendation.Reasoning
+        };
+    }
+
     private static IReadOnlyList<CareerModelScore>
         CreateValidScores()
     {
@@ -359,6 +598,129 @@ public sealed class RecommendationServiceTests
         {
             ArgumentNullException.ThrowIfNull(input);
             return _scores;
+        }
+    }
+
+    private sealed class ReversingRecommendationRepository(
+        IRecommendationRepository inner) : IRecommendationRepository
+    {
+        public Task<RecommendationSession?> GetByIdAsync(Guid id) =>
+            inner.GetByIdAsync(id);
+
+        public Task<IEnumerable<RecommendationSession>> GetAllAsync() =>
+            inner.GetAllAsync();
+
+        public async Task<IEnumerable<RecommendationSession>>
+            GetByStudentProfileIdAsync(Guid studentProfileId)
+        {
+            var sessions = (await inner.GetByStudentProfileIdAsync(
+                    studentProfileId))
+                .ToList();
+
+            foreach (var session in sessions)
+            {
+                session.Recommendations.Reverse();
+            }
+
+            return sessions;
+        }
+
+        public Task AddAsync(RecommendationSession entity) =>
+            inner.AddAsync(entity);
+
+        public Task UpdateAsync(RecommendationSession entity) =>
+            inner.UpdateAsync(entity);
+
+        public Task DeleteAsync(Guid id) => inner.DeleteAsync(id);
+    }
+
+    private sealed class MismatchedProfileRepository(Guid requestedId)
+        : IStudentProfileRepository
+    {
+        public Task<StudentProfile?> GetByIdAsync(Guid id) =>
+            Task.FromResult<StudentProfile?>(new StudentProfile
+            {
+                Id = id == requestedId ? Guid.NewGuid() : requestedId
+            });
+
+        public Task<IEnumerable<StudentProfile>> GetAllAsync() =>
+            throw new InvalidOperationException("Unexpected profile access.");
+
+        public Task AddAsync(StudentProfile entity) =>
+            throw new InvalidOperationException("Unexpected profile write.");
+
+        public Task UpdateAsync(StudentProfile entity) =>
+            throw new InvalidOperationException("Unexpected profile write.");
+
+        public Task DeleteAsync(Guid id) =>
+            throw new InvalidOperationException("Unexpected profile write.");
+    }
+
+    private sealed class DownstreamAssessmentService : IAssessmentService
+    {
+        public int Calls { get; private set; }
+
+        public Task<AssessmentSession?> GetLatestCompletedAssessmentAsync(
+            Guid studentProfileId)
+        {
+            Calls++;
+            throw new InvalidOperationException("Assessment must not be read.");
+        }
+
+        public AssessmentSession CreateAssessmentSession(Guid studentProfileId) =>
+            throw new NotSupportedException();
+        public Guid? GetAvailableStudentProfileId() => throw new NotSupportedException();
+        public List<AssessmentQuestion> GetAllQuestions() => throw new NotSupportedException();
+        public AssessmentQuestion? GetQuestion(Guid questionId) => throw new NotSupportedException();
+        public AssessmentSession? GetAssessmentSession(Guid sessionId) => throw new NotSupportedException();
+        public ValidationResult SubmitResponse(AssessmentSession session, Guid questionId, Guid optionId) =>
+            throw new NotSupportedException();
+        public ValidationResult CompleteAssessmentSession(AssessmentSession session) =>
+            throw new NotSupportedException();
+        public List<AssessmentResponse> GetSessionResponses(Guid sessionId) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class DownstreamCareerRepository : ICareerRepository
+    {
+        public int Calls { get; private set; }
+        private T Unexpected<T>()
+        {
+            Calls++;
+            throw new InvalidOperationException("Career repository must not be read.");
+        }
+        public Task<CareerProfile?> GetByCodeAsync(string code) => Unexpected<Task<CareerProfile?>>();
+        public Task<CareerProfile?> GetByIdAsync(Guid id) => Unexpected<Task<CareerProfile?>>();
+        public Task<IEnumerable<CareerProfile>> GetAllAsync() => Unexpected<Task<IEnumerable<CareerProfile>>>();
+        public Task AddAsync(CareerProfile entity) => Unexpected<Task>();
+        public Task UpdateAsync(CareerProfile entity) => Unexpected<Task>();
+        public Task DeleteAsync(Guid id) => Unexpected<Task>();
+    }
+
+    private sealed class DownstreamRecommendationRepository
+        : IRecommendationRepository
+    {
+        public int Calls { get; private set; }
+        private T Unexpected<T>()
+        {
+            Calls++;
+            throw new InvalidOperationException("Recommendation repository must not be accessed.");
+        }
+        public Task<RecommendationSession?> GetByIdAsync(Guid id) => Unexpected<Task<RecommendationSession?>>();
+        public Task<IEnumerable<RecommendationSession>> GetAllAsync() => Unexpected<Task<IEnumerable<RecommendationSession>>>();
+        public Task<IEnumerable<RecommendationSession>> GetByStudentProfileIdAsync(Guid studentProfileId) => Unexpected<Task<IEnumerable<RecommendationSession>>>();
+        public Task AddAsync(RecommendationSession entity) => Unexpected<Task>();
+        public Task UpdateAsync(RecommendationSession entity) => Unexpected<Task>();
+        public Task DeleteAsync(Guid id) => Unexpected<Task>();
+    }
+
+    private sealed class DownstreamPredictor : ICareerModelPredictor
+    {
+        public int Calls { get; private set; }
+        public IReadOnlyList<CareerModelScore> Predict(CareerTrainingInput input)
+        {
+            Calls++;
+            throw new InvalidOperationException("Predictor must not run.");
         }
     }
 

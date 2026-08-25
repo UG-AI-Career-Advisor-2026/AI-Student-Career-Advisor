@@ -6,13 +6,16 @@ The project is built with .NET 10, Blazor, ASP.NET Core, Entity Framework Core, 
 
 ## Development Status
 
-CareerIQ currently supports the complete Sprint 3 journey:
+CareerIQ supports the complete Sprint 4 journey:
 
 1. Create and save a student profile.
 2. Complete the 15-question career assessment.
 3. Generate three ranked, model-backed career recommendations.
 4. View each career's title, description, match score and explanation.
-5. Reopen the latest saved recommendation session after refreshing the page.
+5. Compare saved skills with a recommended career's catalogue requirements.
+6. Generate or reopen a persisted learning roadmap.
+7. Save roadmap-step progress and reopen it after restarting the application.
+8. Review previous recommendation sessions and their original saved values.
 
 Currently implemented:
 
@@ -31,9 +34,15 @@ Currently implemented:
 - Generate explanations from the student's actual saved inputs
 - Display an advisory-use disclaimer
 - Persist recommendation sessions and reopen saved results
+- Compare every required career skill using deterministic matching rules
+- Classify skill gaps as Missing, Needs Development or Matched
+- Generate bounded, deterministic roadmaps only for persisted recommendations
+- Persist roadmap steps and completion timestamps in SQLite
+- Reopen roadmap progress after a page refresh or application restart
+- Review recommendation history newest first and reopen saved session details
 - Reject missing profiles and incomplete assessments
 - Return an error instead of fabricated fallback recommendations
-- Provide responsive desktop and mobile recommendation layouts
+- Provide responsive desktop and mobile layouts for the complete journey
 
 The eight supported careers are:
 
@@ -106,6 +115,12 @@ Complete the application journey in this order:
 6. Open **Recommendations**.
 7. Select **Generate recommendations**.
 8. Review the three ranked recommendation cards.
+9. Open **Learning Roadmap**.
+10. Select one of the three careers from the newest recommendation session.
+11. Review the real Missing, Needs Development and Matched skill groups.
+12. Select **Generate or reopen roadmap**.
+13. Mark roadmap steps complete or incomplete. Progress is saved immediately.
+14. Open **Recommendation History** to review saved sessions newest first.
 
 Each recommendation card displays:
 
@@ -117,7 +132,21 @@ Each recommendation card displays:
 
 The page also displays a disclaimer explaining that the recommendations are advisory.
 
-Refreshing the page reopens the latest persisted recommendation session. Generating new results creates another saved recommendation session instead of inventing client-side results.
+Refreshing the page reopens the latest persisted recommendation session. When
+generation produces the same ranked career IDs, exact scores and explanations,
+CareerIQ reuses the newest identical session without writing another history
+entry. Changed careers, rank, exact scores or explanations create a new saved
+session. The page never invents client-side results.
+
+A learning roadmap can only be generated for a career that appears in a
+persisted recommendation session belonging to the selected saved profile. If a
+roadmap already exists for that profile and career, CareerIQ reopens it without
+regenerating its content or resetting progress. Roadmap steps are academic
+guidance based on deterministic skill gaps and the approved career catalogue.
+
+Recommendation History is read-only. It preserves the original three career
+identities, scores and explanations saved with each session; it does not rerun
+the model or recalculate historical values.
 
 If the student has no saved profile or completed assessment, the page displays the required next action. If model prediction fails, CareerIQ displays an error and does not create fallback recommendations.
 
@@ -145,7 +174,8 @@ The runtime recommendation engine:
 7. Selects the three highest unique careers.
 8. Maps each model label to the correct career-catalogue entry.
 9. Generates an input-based explanation.
-10. Persists the session and its three recommendations in SQLite.
+10. Reuses the newest identical saved session, or persists the changed session
+    and its three recommendations in SQLite.
 
 ## Retraining the Model
 
@@ -182,7 +212,11 @@ git status
 
 Do not commit a newly trained model unless its dataset, metadata and test results have been reviewed.
 
-See [docs/ML_APPROACH.md](docs/ML_APPROACH.md) for the complete feature mapping and training design.
+See [docs/ML_APPROACH.md](docs/ML_APPROACH.md) for the complete feature mapping
+and training design, [docs/SKILL_GAP_MATCHING.md](docs/SKILL_GAP_MATCHING.md)
+for deterministic skill matching, and
+[docs/LEARNING_ROADMAP.md](docs/LEARNING_ROADMAP.md) for roadmap generation and
+progress rules.
 
 ## Database and Migrations
 
@@ -210,6 +244,10 @@ dotnet ef database update \
   --startup-project src/CareerAdvisor.Web
 ```
 
+The automatic startup migration and the manual command are alternatives. Do
+not run the manual command against a database unless that database is the
+intended target. Automated tests use isolated disposable SQLite databases.
+
 Local SQLite database files are ignored by Git using:
 
 ```text
@@ -234,6 +272,14 @@ dotnet test CareerAdvisor.sln \
   --filter "FullyQualifiedName~Sprint3IntegrationTests"
 ```
 
+Run the Sprint 4 integration tests:
+
+```bash
+dotnet test CareerAdvisor.sln \
+  --configuration Release \
+  --filter "FullyQualifiedName~Sprint4IntegrationTests"
+```
+
 The Sprint 3 integration suite verifies:
 
 - The complete profile → assessment → recommendation journey
@@ -245,6 +291,12 @@ The Sprint 3 integration suite verifies:
 - Missing-profile rejection
 - Incomplete-assessment rejection
 - Absence of fabricated fallback recommendations after model failure
+
+The Sprint 4 integration suite verifies the connected profile → assessment →
+recommendation → skill-gap → persisted roadmap → progress → history journey
+using the committed catalogue and model with a disposable migrated SQLite
+database. It also verifies restart persistence, invalid prerequisites and
+cross-profile isolation without returning fabricated fallback results.
 
 ## Model and Score Limitations
 
@@ -276,20 +328,20 @@ Students should use the recommendations as starting points for exploration and c
 - The career catalogue is a static, read-only JSON file.
 - Only eight technology careers are supported.
 - Real-time labour-market information is not used.
-- Skill-gap analysis is not yet implemented.
-- Personalised learning roadmaps are not yet implemented.
-- Recommendation sessions are persisted, but the dedicated history interface is not yet complete.
+- Skill proficiency is self-reported and does not prove professional readiness.
+- `Intermediate` is an academic MVP comparison baseline, not evidence of
+  employability, certification or professional competence.
+- Certification steps are exploration suggestions, not mandatory employment
+  requirements or enrolment recommendations.
+- Completing a roadmap does not guarantee certification, employment or career
+  success.
 - Production cloud deployment, monitoring and security hardening are outside the current MVP.
 
 ## Planned Work
 
-Remaining MVP work includes:
-
-- Skill-gap analysis
-- Personalised learning roadmaps
-- Recommendation-history interface
-- Final integration and quality review
-- Demonstration and presentation preparation
+Post-MVP work may include authentication, production deployment hardening,
+institutional integration and evidence-based expansion beyond the current
+eight-career academic catalogue.
 
 ## Contribution Workflow
 

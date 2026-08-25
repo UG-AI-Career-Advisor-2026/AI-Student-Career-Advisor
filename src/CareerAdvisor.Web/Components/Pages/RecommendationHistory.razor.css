@@ -169,9 +169,11 @@
 }
 
 .session-link:focus-visible,
-.history-shell .btn:focus-visible {
-    outline: 3px solid #f5b700;
-    outline-offset: 3px;
+.history-shell .btn:focus-visible,
+.history-shell a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 5px #102a43;
 }
 
 .career-summary-list {

@@ -22,6 +22,13 @@ public interface ICareerService
 public interface IRecommendationService
 {
     Task<RecommendationSession> GenerateRecommendationsAsync(Guid studentProfileId);
+
+    /// <summary>
+    /// Generates recommendations and reports whether a new saved session was
+    /// required or an identical latest session was retained.
+    /// </summary>
+    Task<RecommendationGenerationResult> GenerateRecommendationsWithOutcomeAsync(
+        Guid studentProfileId);
 }
 
 /// <summary>
